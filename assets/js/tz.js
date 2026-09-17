@@ -78,9 +78,15 @@ export function dayDelta(parts, refParts) {
   return Math.round((a - b) / 86400000);
 }
 
-/** Which of the three tile colours a local hour falls into. */
+/**
+ * Which of the three tile colours a local hour falls into.
+ *
+ * Boundaries read off the original app while scrubbing its timeline: 17:59 is
+ * still green and 18:00 is not, 8:59 is white and 9:00 is green. Evening is
+ * grouped with the night rather than with the early morning.
+ */
 export function dayState(hour) {
   if (hour >= 9 && hour < 18) return 'work';
-  if (hour >= 6 && hour < 21) return 'awake';
+  if (hour >= 6 && hour < 9) return 'early';
   return 'asleep';
 }

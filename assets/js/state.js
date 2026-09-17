@@ -22,6 +22,8 @@ export const state = {
   homeId: null,
   hour12: false,
   daylight: true,
+  // Set when a shared link carried a specific moment; consumed once by main.
+  sharedAt: null,
 };
 
 const listeners = new Set();
@@ -87,6 +89,8 @@ export function init() {
   state.ids = ids;
   state.hour12 = Boolean(stored?.hour12);
   state.daylight = stored?.daylight !== false;
+  // Only a link carries a moment; a value in storage would be stale.
+  state.sharedAt = fromHash ? (fromHash.sharedAt ?? null) : null;
   state.homeId =
     stored?.homeId && ids.includes(stored.homeId)
       ? stored.homeId
@@ -126,12 +130,17 @@ function readStorage() {
   }
 }
 
-/** Build the `#c=…` fragment that encodes the current strip. */
-export function shareFragment() {
+/**
+ * Build the `#c=…` fragment that encodes the current strip. When the timeline
+ * is away from now, the selected moment travels with the link as an absolute
+ * instant — the recipient should see the time you picked, not their own.
+ */
+export function shareFragment(shownAt = null, travelMs = 0) {
   const parts = [`c=${encodeURIComponent(state.ids.join(';'))}`];
   if (state.homeId) parts.push(`h=${encodeURIComponent(state.homeId)}`);
   if (state.hour12) parts.push('f=12');
   if (!state.daylight) parts.push('d=0');
+  if (shownAt && travelMs !== 0) parts.push(`t=${Math.round(shownAt.getTime() / 1000)}`);
   return `#${parts.join('&')}`;
 }
 
@@ -146,10 +155,13 @@ function readHash() {
   const ids = raw.split(';').filter(Boolean);
   if (!ids.length) return null;
 
+  const t = Number(params.get('t'));
+
   return {
     ids,
     homeId: params.get('h') || null,
     hour12: params.get('f') === '12',
     daylight: params.get('d') !== '0',
+    sharedAt: Number.isFinite(t) && t > 0 ? t * 1000 : null,
   };
 }

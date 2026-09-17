@@ -19,6 +19,8 @@ import {
 import { zonedParts, formatTime, offsetLabel, dayDelta, dayState } from './tz.js';
 import { WorldMap } from './worldmap.js';
 import { PinLayer } from './pins.js';
+import { Timeline } from './timeline.js';
+import { downloadInvite } from './calendar.js';
 
 // Update this after forking, or drop the link from index.html.
 const REPO_URL = 'https://github.com/ondrik/WebZoneClock';
@@ -32,6 +34,16 @@ const el = {
   daylight: document.getElementById('toggle-daylight'),
   segmented: document.querySelector('.segmented'),
   share: document.getElementById('share'),
+  reveal: document.getElementById('reveal'),
+  mapWrap: document.querySelector('.map-wrap'),
+  timebar: document.getElementById('timebar'),
+  ruler: document.getElementById('ruler'),
+  rulerTicks: document.getElementById('ruler-ticks'),
+  rulerLine: document.getElementById('ruler-line'),
+  rulerHandle: document.getElementById('ruler-handle'),
+  handleLabel: document.getElementById('handle-label'),
+  handleClear: document.getElementById('handle-clear'),
+  addCalendar: document.getElementById('add-calendar'),
   overlay: document.getElementById('search-overlay'),
   searchInput: document.getElementById('search-input'),
   searchResults: document.getElementById('search-results'),
@@ -43,6 +55,12 @@ const el = {
 
 const map = new WorldMap(el.map);
 const pins = new PinLayer(el.pins);
+
+let timeline = null;
+// Offset from real time, in ms, set by the timeline. Deliberately not
+// persisted: a reload should land you back at "now".
+let travelMs = 0;
+let lastEntries = [];
 
 let lastRenderKey = '';
 let searchIndex = 0;
@@ -59,11 +77,31 @@ async function main() {
   }
 
   initState();
+  // A shared link can pin the view to the moment the sender picked.
+  if (state.sharedAt) travelMs = state.sharedAt - Date.now();
   onChange(() => renderAll(true));
+
+  timeline = new Timeline(
+    {
+      bar: el.timebar,
+      ruler: el.ruler,
+      ticks: el.rulerTicks,
+      line: el.rulerLine,
+      handle: el.rulerHandle,
+      label: el.handleLabel,
+      clear: el.handleClear,
+    },
+    (ms) => {
+      travelMs = ms;
+      renderAll(true);
+    },
+  );
+  if (travelMs !== 0) timeline.offsetMs = travelMs;
 
   bindToolbar();
   bindSearch();
   bindStripInteractions();
+  bindTimebar();
 
   const ro = new ResizeObserver(() => {
     map.resize();
@@ -84,6 +122,16 @@ async function main() {
   });
 }
 
+/** Real time now; the clock the timeline offsets from. */
+function realNow() {
+  return new Date();
+}
+
+/** The instant the whole display is showing — now, shifted by the timeline. */
+function shownNow() {
+  return new Date(Date.now() + travelMs);
+}
+
 /** Everything the display depends on, as a string; unchanged means no work. */
 function renderKey(now) {
   return [
@@ -94,19 +142,24 @@ function renderKey(now) {
     state.daylight ? 1 : 0,
     map.width,
     map.height,
+    travelMs,
   ].join('|');
 }
 
 function renderAll(force) {
-  const now = new Date();
+  const now = shownNow();
   const key = renderKey(now);
   if (!force && key === lastRenderKey) return;
   lastRenderKey = key;
 
   const entries = buildEntries(now);
+  lastEntries = entries;
   renderStrip(entries);
   map.draw(now, state.daylight);
   pins.render(entries, map);
+
+  timeline?.render(realNow(), homeTimezone(), state.hour12);
+  el.addCalendar.disabled = travelMs === 0 || !entries.length;
 }
 
 /** One record per city on the strip, holding everything both views need. */
@@ -167,7 +220,7 @@ function buildTile(entry) {
   tile.draggable = true;
   tile.title = entry.isHome
     ? `${entry.city.label} — your home city. Click to unset.`
-    : `${entry.city.label}, ${entry.city.country} (${entry.offsetLabel}). Click to make this your home city.`;
+    : `${entry.city.label}, ${entry.city.country}. Click to make this your home city.`;
 
   const remove = document.createElement('button');
   remove.className = 'tile-remove';
@@ -210,8 +263,13 @@ function buildTile(entry) {
 
   const sub = document.createElement('div');
   sub.className = 'tile-sub';
-  // The home city shows its UTC offset where the others show their country.
-  sub.textContent = entry.isHome ? entry.offsetLabel : entry.city.country;
+  const country = document.createElement('span');
+  country.className = 'sub-country';
+  country.textContent = entry.city.country;
+  const offset = document.createElement('span');
+  offset.className = 'sub-offset';
+  offset.textContent = entry.offsetLabel;
+  sub.append(country, offset);
   tile.appendChild(sub);
 
   return tile;
@@ -298,6 +356,9 @@ function bindToolbar() {
   syncSegmented();
 
   el.share.addEventListener('click', share);
+  el.addCalendar.addEventListener('click', () => {
+    downloadInvite(shownNow(), lastEntries);
+  });
 
   document.addEventListener('keydown', (e) => {
     if (el.overlay.hidden && (e.key === 'n' || e.key === '+') && !e.metaKey && !e.ctrlKey) {
@@ -305,6 +366,40 @@ function bindToolbar() {
       openSearch();
     }
   });
+}
+
+/**
+ * The time bar appears when the pointer nears the bottom of the map, and the
+ * collapsed button both hints at it and works as a tap target where there is
+ * no pointer to hover with.
+ */
+function bindTimebar() {
+  const REVEAL_ZONE = 130; // px from the bottom edge
+
+  el.mapWrap.addEventListener('pointermove', (e) => {
+    if (e.pointerType !== 'mouse') return;
+    const rect = el.mapWrap.getBoundingClientRect();
+    const near = e.clientY > rect.bottom - REVEAL_ZONE;
+    el.mapWrap.classList.toggle('reveal', near);
+    el.reveal.setAttribute('aria-expanded', String(near));
+  });
+
+  el.mapWrap.addEventListener('pointerleave', () => {
+    if (timeline?.dragging) return;
+    el.mapWrap.classList.remove('reveal');
+    el.reveal.setAttribute('aria-expanded', 'false');
+  });
+
+  el.reveal.addEventListener('click', () => {
+    const on = !el.mapWrap.classList.contains('reveal');
+    el.mapWrap.classList.toggle('reveal', on);
+    el.reveal.setAttribute('aria-expanded', String(on));
+  });
+
+  // Re-tick the ruler labels when the box changes width.
+  new ResizeObserver(() => timeline?.render(realNow(), homeTimezone(), state.hour12)).observe(
+    el.ruler,
+  );
 }
 
 function syncSegmented() {
@@ -315,7 +410,8 @@ function syncSegmented() {
 }
 
 async function share() {
-  const url = location.origin + location.pathname + location.search + shareFragment();
+  const url =
+    location.origin + location.pathname + location.search + shareFragment(shownNow(), travelMs);
   try {
     await navigator.clipboard.writeText(url);
     toast('Link copied to the clipboard');

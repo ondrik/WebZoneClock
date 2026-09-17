@@ -18,7 +18,7 @@ const LAND = '#6a6a6c';
 // soft twilight ramp between them.
 const DAY_ELEV = 4;
 const NIGHT_ELEV = -8;
-const NIGHT_ALPHA = 0.4;
+const NIGHT_ALPHA = 0.33;
 
 const GRID_W = 480;
 const GRID_H = 240;

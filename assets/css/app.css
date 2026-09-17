@@ -5,15 +5,15 @@
   --toolbar-fg-dim: #8a8a8e;
   --accent: #0a84ff;
 
-  /* Tile states. "work" = local working hours, "awake" = up but off the clock,
-     "asleep" = the middle of their night. */
+  /* Tile states. "work" = local working hours, "early" = up but not yet at
+     work, "asleep" = evening and night. */
   --tile-work-bg: #9fc92e;
   --tile-work-fg: #ffffff;
   --tile-work-sub: rgba(255, 255, 255, 0.78);
 
-  --tile-awake-bg: #ffffff;
-  --tile-awake-fg: #1c1c1e;
-  --tile-awake-sub: #6f6f73;
+  --tile-early-bg: #ffffff;
+  --tile-early-fg: #1c1c1e;
+  --tile-early-sub: #6f6f73;
 
   --tile-asleep-bg: #3c3c3e;
   --tile-asleep-fg: #f2f2f4;
@@ -23,7 +23,7 @@
   --land: #6a6a6c;
 
   --pin-work: #9fc92e;
-  --pin-awake: #f2f2f4;
+  --pin-early: #f2f2f4;
   --pin-asleep: #7c7c80;
 
   --strip-radius: 10px;
@@ -170,7 +170,7 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round
 .tile.drop-target { box-shadow: inset 3px 0 0 var(--accent); }
 
 .tile[data-state="work"]   { background: var(--tile-work-bg);   color: var(--tile-work-fg); }
-.tile[data-state="awake"]  { background: var(--tile-awake-bg);  color: var(--tile-awake-fg); }
+.tile[data-state="early"]  { background: var(--tile-early-bg);  color: var(--tile-early-fg); }
 .tile[data-state="asleep"] { background: var(--tile-asleep-bg); color: var(--tile-asleep-fg); }
 
 .tile-time {
@@ -212,24 +212,35 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round
 }
 .tile-name svg { width: 12px; height: 12px; flex: 0 0 auto; }
 .tile-sub {
+  position: relative;
   margin-top: 2px;
   font-size: 13.5px;
   font-weight: 400;
   line-height: 1.25;
 }
 
+/* The country gives way to the UTC offset while the tile is hovered. */
+.tile-sub .sub-offset { display: none; }
+.tile:hover .tile-sub .sub-country { display: none; }
+.tile:hover .tile-sub .sub-offset { display: inline; }
+
 .tile[data-state="work"]   .tile-sub { color: var(--tile-work-sub); }
-.tile[data-state="awake"]  .tile-sub { color: var(--tile-awake-sub); }
+.tile[data-state="early"]  .tile-sub { color: var(--tile-early-sub); }
 .tile[data-state="asleep"] .tile-sub { color: var(--tile-asleep-sub); }
 
 /* Yesterday / tomorrow relative to your own day. */
+/* Sits above the clock, as in the original. */
 .tile-dayoff {
-  margin-bottom: 3px;
-  font-size: 10.5px;
+  position: absolute;
+  top: 12px;
+  left: 0;
+  width: 100%;
+  font-size: 10px;
   font-weight: 500;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.07em;
+  text-align: center;
   text-transform: uppercase;
-  opacity: 0.6;
+  opacity: 0.55;
 }
 
 .tile-remove {
@@ -330,10 +341,10 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round
 .pin[data-state="work"] .pin-time { color: var(--pin-work); }
 .pin[data-state="work"] .pin-city { color: #eaeaec; }
 
-.pin[data-state="awake"] .pin-dot { background: var(--pin-awake); }
-.pin[data-state="awake"] .pin-arrow { color: var(--pin-awake); }
-.pin[data-state="awake"] .pin-time { color: var(--pin-awake); }
-.pin[data-state="awake"] .pin-city { color: #eaeaec; }
+.pin[data-state="early"] .pin-dot { background: var(--pin-early); }
+.pin[data-state="early"] .pin-arrow { color: var(--pin-early); }
+.pin[data-state="early"] .pin-time { color: var(--pin-early); }
+.pin[data-state="early"] .pin-city { color: #eaeaec; }
 
 /* Beyond the projection's latitude window: clamped to the edge, so shown as
    an approximation rather than a precise location. */
@@ -363,6 +374,165 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round
 }
 .share-btn svg { width: 19px; height: 19px; }
 .share-btn:hover { background: rgba(78, 78, 80, 0.9); }
+
+/* -------------------------------------------------------------- time bar */
+/* Hidden until the pointer reaches the bottom of the map, or until you are
+   away from "now" — the same reveal the original uses. */
+.timebar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 0 0 4px;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.16s ease, transform 0.16s ease;
+  pointer-events: none;
+}
+.map-wrap.reveal .timebar,
+.timebar[data-travelling="true"] {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+.timebar-actions {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.tb-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 13px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 7px;
+  background: rgba(58, 58, 60, 0.9);
+  color: #e8e8ea;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+}
+.tb-btn:hover:not(:disabled) { background: rgba(78, 78, 80, 0.95); }
+.tb-btn:disabled { opacity: 0.4; cursor: default; }
+.tb-btn.primary { background: var(--accent); border-color: transparent; color: #fff; }
+.tb-btn.primary:hover:not(:disabled) { background: #3b9bff; }
+.tb-icon { width: 14px; height: 14px; }
+
+.ruler {
+  position: relative;
+  height: 40px;
+  margin: 0 8px;
+  border-radius: 6px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0));
+  cursor: ew-resize;
+  touch-action: none;
+  outline: none;
+}
+.ruler:focus-visible { box-shadow: 0 0 0 2px var(--accent); }
+
+.ruler-ticks {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.tick {
+  position: absolute;
+  bottom: 0;
+  width: 1px;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.22);
+}
+.tick.mid { height: 9px; background: rgba(255, 255, 255, 0.34); }
+.tick.major { height: 40px; background: rgba(255, 255, 255, 0.14); }
+
+.tick-label {
+  position: absolute;
+  bottom: 7px;
+  transform: translateX(-50%);
+  color: rgba(255, 255, 255, 0.42);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.tick-dayedge {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.2);
+}
+.tick-dayname {
+  position: absolute;
+  top: 1px;
+  margin-left: 5px;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 10px;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+/* The span between "now" and the selection. */
+.ruler-line {
+  position: absolute;
+  bottom: 12px;
+  height: 2px;
+  border-radius: 1px;
+  pointer-events: none;
+}
+.ruler-line[data-dir="future"] { background: var(--accent); }
+.ruler-line[data-dir="past"] { background: #ff453a; }
+.ruler-line[data-dir="none"] { background: none; }
+
+.ruler-handle {
+  position: absolute;
+  bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 18px;
+  padding: 0 3px 0 7px;
+  border-radius: 9px;
+  background: rgba(120, 120, 124, 0.95);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.ruler-handle[data-dir="future"] { background: var(--accent); }
+.ruler-handle[data-dir="past"] { background: #ff453a; }
+
+.handle-clear {
+  display: grid;
+  place-items: center;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.22);
+  color: #fff;
+  cursor: pointer;
+  pointer-events: auto;
+}
+.handle-clear svg { width: 8px; height: 8px; stroke-width: 2.4; }
+.handle-clear:hover { background: rgba(0, 0, 0, 0.4); }
+.ruler-handle[data-dir="none"] .handle-clear { display: none; }
+
+/* The collapsed affordance hides once the bar is up. */
+.map-wrap.reveal .share-btn,
+.map-wrap:has(.timebar[data-travelling="true"]) .share-btn { opacity: 0; pointer-events: none; }
+.share-btn { transition: opacity 0.16s ease; }
 
 /* --------------------------------------------------------------- overlay */
 .overlay {
@@ -506,11 +676,18 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round
   .pin-city { font-size: 10.5px; }
   .pin-time { font-size: 13px; }
 
-  .share-btn {
+  .share-btn { display: none; }
+
+  .timebar {
     position: static;
-    margin: 12px auto 16px;
+    padding: 12px 0 16px;
+    opacity: 1;
     transform: none;
+    pointer-events: auto;
   }
+
+  .ruler { height: 44px; }
+  .tick-label { font-size: 10px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -10,11 +10,18 @@ dependencies — it is meant to be served straight off GitHub Pages.
 ## What it does
 
 - **City tiles**, coloured by local hour: green during working hours
-  (09:00–18:00), white when people are up but off the clock (06:00–09:00 and
-  18:00–21:00), dark grey overnight (21:00–06:00).
-- **A home city**, marked with a locator arrow and showing its UTC offset
-  (`GMT+2`) where the other tiles show their country. Click any tile to move
-  it; click again to clear.
+  (09:00–18:00), white in the early morning (06:00–09:00), dark grey through
+  the evening and night (18:00–06:00).
+- **Time travel.** Drag the ruler along the bottom of the map and every clock,
+  tile colour and the map's shading move together, so you can find an hour
+  that is civil in all of them. The handle reads the offset from now (`+1:41`,
+  `-6:44`), blue into the future and red into the past, and its `×` snaps back
+  to now. Arrow keys nudge by 15 minutes, <kbd>Shift</kbd> by an hour.
+- **Add to calendar**, enabled once you are away from now: downloads an `.ics`
+  for the selected slot with every city's local time written into the event.
+- **A home city**, marked with a locator arrow. Click any tile to move it;
+  click again to clear. Hovering a tile swaps its country line for that
+  zone's UTC offset.
 - **A `TOMORROW` / `YESTERDAY` caption** when a city is not on the same
   calendar day as home — the thing that actually catches people out.
 - **A world map** with each city pinned at its real coordinates, labels
@@ -23,8 +30,10 @@ dependencies — it is meant to be served straight off GitHub Pages.
 - **Add, remove and reorder**: `+` or the <kbd>n</kbd> key opens search over
   ~2,300 cities, `×` on a tile removes it, and tiles drag to reorder.
 - **12/24-hour** toggle, and a daylight toggle for the map shading.
-- **Shareable links**: the share button copies a URL with your cities encoded
-  in the fragment. Otherwise the set is remembered in `localStorage`.
+- **Shareable links**: the share button copies a URL with your cities in the
+  fragment; if you are time-travelling it carries the chosen moment too, so
+  the recipient sees the slot you picked. Otherwise the set is remembered in
+  `localStorage`.
 
 Every timezone comes from the browser's own IANA database via `Intl`, so DST
 and half-hour and 45-minute offsets are handled without a lookup table of
@@ -68,10 +77,17 @@ the "Source" link in the toolbar.
 | `worldmap.js` | Canvas: land, day/night shading, city → pixel |
 | `pins.js` | Map markers and the label placement solver |
 | `citydb.js` | Loading, searching and ranking the city database |
+| `timeline.js` | The time-travel ruler: ticks, day bands, drag and keyboard |
+| `calendar.js` | Building the `.ics` invitation |
 | `state.js` | The city list, persistence, and share-link encoding |
 | `main.js` | Wiring, the strip, and the once-a-minute render |
 
-Three parts are worth knowing about:
+The time offset is held *relative* to now rather than as a fixed instant, so
+the clocks keep ticking while you are away from now and the handle keeps
+reading `+1:41`. Every part of the display reads the clock through one
+function, which is what makes time travel apply uniformly.
+
+Three other parts are worth knowing about:
 
 **The projection.** Longitude always spans the full 360°; the latitude window
 is then derived from the container's aspect ratio so that a degree of latitude
@@ -138,4 +154,10 @@ endorsed by, or derived from the code of World Clock Pro or its publisher.
   places added by hand. A smaller town will not be in the list; add it to
   `MANUAL` in `tools/build_cities.py`.
 - Working hours are hardcoded to 09:00–18:00 local for every city, and are not
-  weekend-aware.
+  weekend-aware. The three colour bands were read off the original app by
+  scrubbing its timeline and checking where each tile changed.
+- The timeline spans one day either side of now. The original slides its ruler
+  indefinitely; this one has fixed ends, which keeps dragging predictable at
+  the cost of a longer reach.
+- Calendar events are a fixed 30 minutes, and are downloaded as a file rather
+  than written into a calendar account.

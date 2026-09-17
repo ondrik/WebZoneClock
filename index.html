@@ -54,13 +54,43 @@
   <main class="map-wrap">
     <canvas id="map" class="map-canvas"></canvas>
     <div id="pins" class="pin-layer" aria-hidden="true"></div>
-    <button id="share" class="share-btn" type="button" title="Copy a link to this set of cities"
-            aria-label="Copy a link to this set of cities">
+    <button id="reveal" class="share-btn" type="button" title="Plan a time"
+            aria-label="Plan a time" aria-expanded="false">
       <svg viewBox="0 0 20 20" aria-hidden="true">
         <path d="M10 13.5V3.2M6.2 6.8L10 3l3.8 3.8"/>
         <path d="M4.5 12.4v3.1a1.4 1.4 0 0 0 1.4 1.4h8.2a1.4 1.4 0 0 0 1.4-1.4v-3.1"/>
       </svg>
     </button>
+
+    <div id="timebar" class="timebar" data-travelling="false">
+      <div class="timebar-actions">
+        <button id="add-calendar" class="tb-btn" type="button" disabled
+                title="Download a calendar invitation for the selected time">
+          Add to calendar
+        </button>
+        <button id="share" class="tb-btn primary" type="button"
+                title="Copy a link to this set of cities">
+          <svg viewBox="0 0 20 20" aria-hidden="true" class="tb-icon">
+            <path d="M10 13.5V3.2M6.2 6.8L10 3l3.8 3.8"/>
+            <path d="M4.5 12.4v3.1a1.4 1.4 0 0 0 1.4 1.4h8.2a1.4 1.4 0 0 0 1.4-1.4v-3.1"/>
+          </svg>
+          Share
+        </button>
+      </div>
+
+      <div id="ruler" class="ruler" role="slider" tabindex="0"
+           aria-label="Shift every clock by an offset from now"
+           aria-valuemin="-1440" aria-valuemax="1440" aria-valuenow="0" aria-valuetext="Now">
+        <div id="ruler-ticks" class="ruler-ticks"></div>
+        <div id="ruler-line" class="ruler-line" data-dir="none"></div>
+        <div id="ruler-handle" class="ruler-handle" data-dir="none">
+          <span id="handle-label">Now</span>
+          <button class="handle-clear" id="handle-clear" type="button" aria-label="Back to now">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 6l8 8M14 6l-8 8"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
   </main>
 
 </div>
