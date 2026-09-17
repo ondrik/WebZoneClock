@@ -1,0 +1,141 @@
+# WebZoneClock
+
+A world clock for the browser, modelled on the desktop app **World Clock Pro**:
+a strip of city tiles that colour themselves by what people there are probably
+doing, over a world map with a live day/night terminator.
+
+Static HTML, CSS and ES modules. No build step, no framework, no runtime
+dependencies — it is meant to be served straight off GitHub Pages.
+
+## What it does
+
+- **City tiles**, coloured by local hour: green during working hours
+  (09:00–18:00), white when people are up but off the clock (06:00–09:00 and
+  18:00–21:00), dark grey overnight (21:00–06:00).
+- **A home city**, marked with a locator arrow and showing its UTC offset
+  (`GMT+2`) where the other tiles show their country. Click any tile to move
+  it; click again to clear.
+- **A `TOMORROW` / `YESTERDAY` caption** when a city is not on the same
+  calendar day as home — the thing that actually catches people out.
+- **A world map** with each city pinned at its real coordinates, labels
+  routed around each other, and day/night shading computed from the sun's
+  position.
+- **Add, remove and reorder**: `+` or the <kbd>n</kbd> key opens search over
+  ~2,300 cities, `×` on a tile removes it, and tiles drag to reorder.
+- **12/24-hour** toggle, and a daylight toggle for the map shading.
+- **Shareable links**: the share button copies a URL with your cities encoded
+  in the fragment. Otherwise the set is remembered in `localStorage`.
+
+Every timezone comes from the browser's own IANA database via `Intl`, so DST
+and half-hour and 45-minute offsets are handled without a lookup table of
+mine to go stale.
+
+## Running it locally
+
+The page fetches `data/*.json` and loads ES modules, so `file://` will not
+work — it needs an HTTP origin:
+
+```sh
+python3 -m http.server 8777
+# then open http://127.0.0.1:8777/
+```
+
+## Deploying
+
+The repository root *is* the site, so GitHub Pages can serve it directly with
+no build step. In *Settings → Pages*, set **Source** to **Deploy from a
+branch**, branch `main`, folder `/ (root)`. `.nojekyll` is present so Pages
+serves the tree verbatim instead of running it through Jekyll.
+
+Every push to `main` republishes.
+
+If you would rather deploy through GitHub Actions — worth it only if you add a
+build step later — note that pushing a file under `.github/workflows/` needs a
+token with the `workflow` scope (`gh auth refresh -s workflow`).
+
+After forking, update `REPO_URL` at the top of `assets/js/main.js`; it drives
+the "Source" link in the toolbar.
+
+## How it works
+
+`assets/js/` is one module per concern:
+
+| Module | Responsibility |
+| --- | --- |
+| `solar.js` | Subsolar point and solar elevation from a date |
+| `tz.js` | Zoned wall-clock fields, UTC offsets, day-difference, tile state |
+| `geo.js` | Equirectangular projection sized to its container |
+| `worldmap.js` | Canvas: land, day/night shading, city → pixel |
+| `pins.js` | Map markers and the label placement solver |
+| `citydb.js` | Loading, searching and ranking the city database |
+| `state.js` | The city list, persistence, and share-link encoding |
+| `main.js` | Wiring, the strip, and the once-a-minute render |
+
+Three parts are worth knowing about:
+
+**The projection.** Longitude always spans the full 360°; the latitude window
+is then derived from the container's aspect ratio so that a degree of latitude
+and a degree of longitude get the same number of pixels. The map is therefore
+never stretched. On a container too tall to hold the globe at that scale — a
+phone in portrait — the map is letterboxed into a band instead of distorted to
+fill it, and the tiles wrap into a grid to use the space the map cannot.
+
+**The terminator.** Solar declination and the subsolar longitude come from the
+low-precision almanac formulae, accurate to a fraction of a degree, which is
+far better than one pixel on a world map. Alpha is computed on a 480×240 grid
+and scaled up with smoothing: solar elevation varies smoothly over the globe,
+so interpolating is indistinguishable from solving per pixel and much cheaper.
+Land is drawn lit and then darkened, with a soft twilight ramp between +4° and
+−8° of elevation.
+
+**Label placement.** A pin is anchored at its city's exact coordinates and
+never moves; only its label does. Each label tries a series of offsets — beside
+the dot, then progressively above or below on either side — and takes the first
+that clears every label and every dot already placed. Cities are placed in
+descending population order, so when something has to give, it is the smaller
+town that moves. If nothing fits, the label takes its preferred spot and
+overlaps rather than disappearing.
+
+`data/` is generated and checked in; see [`tools/README.md`](tools/README.md)
+to regenerate it.
+
+## License
+
+The code is released into the public domain under [The
+Unlicense](LICENSE) — use it for anything, with no conditions.
+
+That dedication covers this project's own code but cannot reach the generated
+files in `data/`, which carry their upstream terms. `data/land.json` comes from
+public-domain data and is unencumbered; **`data/cities.json` is CC BY 4.0 and
+requires attribution** if you redistribute it or a work built from it. Keep the
+section below, or regenerate `data/cities.json` from a source whose terms suit
+you better.
+
+## Attribution
+
+Please check these terms yourself before publishing — they are the upstream
+sources, summarised in good faith and not legal advice.
+
+- **Coastlines**: [world-atlas](https://github.com/topojson/world-atlas),
+  derived from [Natural Earth](https://www.naturalearthdata.com/), which is in
+  the public domain.
+- **Cities and timezones**:
+  [city-timezones](https://github.com/kevinroberts/city-timezones) (MIT),
+  whose data derives from SimpleMaps' World Cities Basic database, released
+  under CC BY 4.0 — attribution required.
+- **Typeface**: [Inter](https://rsms.me/inter/), SIL Open Font License, loaded
+  from Google Fonts.
+
+WebZoneClock is an independent reimplementation. It is not affiliated with,
+endorsed by, or derived from the code of World Clock Pro or its publisher.
+
+## Known limitations
+
+- City names come from the upstream dataset. Known transcription errors are
+  corrected in `tools/build_cities.py`, but all 2,300 have not been audited,
+  so some names are missing their diacritics.
+- The population cut-off is 150,000, with capitals and timezone-distinctive
+  places added by hand. A smaller town will not be in the list; add it to
+  `MANUAL` in `tools/build_cities.py`.
+- Working hours are hardcoded to 09:00–18:00 local for every city, and are not
+  weekend-aware.

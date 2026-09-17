@@ -1,0 +1,6 @@
+# Local scratch
+*.log
+.DS_Store
+
+# Upstream data snapshots used only to regenerate data/ (see tools/README.md)
+tools/cache/

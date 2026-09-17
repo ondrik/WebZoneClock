@@ -1,0 +1,518 @@
+/* ---------------------------------------------------------------- tokens */
+:root {
+  --bg: #1b1b1d;
+  --toolbar-fg: #d8d8da;
+  --toolbar-fg-dim: #8a8a8e;
+  --accent: #0a84ff;
+
+  /* Tile states. "work" = local working hours, "awake" = up but off the clock,
+     "asleep" = the middle of their night. */
+  --tile-work-bg: #9fc92e;
+  --tile-work-fg: #ffffff;
+  --tile-work-sub: rgba(255, 255, 255, 0.78);
+
+  --tile-awake-bg: #ffffff;
+  --tile-awake-fg: #1c1c1e;
+  --tile-awake-sub: #6f6f73;
+
+  --tile-asleep-bg: #3c3c3e;
+  --tile-asleep-fg: #f2f2f4;
+  --tile-asleep-sub: #9a9a9e;
+
+  --ocean: #1b2532;
+  --land: #6a6a6c;
+
+  --pin-work: #9fc92e;
+  --pin-awake: #f2f2f4;
+  --pin-asleep: #7c7c80;
+
+  --strip-radius: 10px;
+  --tile-w: 196px;
+  --tile-h: 242px;
+}
+
+/* ------------------------------------------------------------------ base */
+* { box-sizing: border-box; }
+
+html, body { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--toolbar-fg);
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+svg { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.gh-icon { fill: currentColor; stroke: none; }
+
+/* --------------------------------------------------------------- toolbar */
+.toolbar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+}
+
+.toolbar-left, .toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.icon-btn {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--toolbar-fg);
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+.icon-btn svg { width: 18px; height: 18px; }
+.icon-btn.small { width: 26px; height: 26px; border: 0; background: none; color: var(--toolbar-fg-dim); }
+.icon-btn:hover { background: rgba(255, 255, 255, 0.14); color: #fff; }
+.icon-btn[aria-pressed="false"] { color: var(--toolbar-fg-dim); }
+.icon-btn[aria-pressed="false"] .rays { opacity: 0.35; }
+
+.segmented {
+  display: flex;
+  padding: 2px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.08);
+}
+.segmented button {
+  min-width: 30px;
+  padding: 3px 7px;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  color: var(--toolbar-fg-dim);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.segmented button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+
+.text-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 9px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--toolbar-fg);
+  font-size: 12px;
+  font-weight: 500;
+  text-decoration: none;
+}
+.text-btn:hover { background: rgba(255, 255, 255, 0.14); color: #fff; }
+.text-btn svg { width: 13px; height: 13px; }
+
+/* ------------------------------------------------------------ city strip */
+.strip-wrap {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: center;
+  padding: 0 14px 14px;
+}
+
+.strip {
+  display: flex;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  border-radius: var(--strip-radius);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  scrollbar-width: none;
+}
+.strip::-webkit-scrollbar { display: none; }
+
+.tile {
+  position: relative;
+  display: flex;
+  flex: 0 0 var(--tile-w);
+  flex-direction: column;
+  width: var(--tile-w);
+  height: var(--tile-h);
+  padding: 0 8px 22px;
+  border: 0;
+  border-left: 1px solid rgba(255, 255, 255, 0.09);
+  background: var(--tile-asleep-bg);
+  color: var(--tile-asleep-fg);
+  font: inherit;
+  text-align: center;
+  cursor: grab;
+  transition: filter 0.12s ease;
+}
+.tile:first-child { border-left: 0; }
+.tile:hover { filter: brightness(1.06); }
+.tile.dragging { opacity: 0.4; }
+.tile.drop-target { box-shadow: inset 3px 0 0 var(--accent); }
+
+.tile[data-state="work"]   { background: var(--tile-work-bg);   color: var(--tile-work-fg); }
+.tile[data-state="awake"]  { background: var(--tile-awake-bg);  color: var(--tile-awake-fg); }
+.tile[data-state="asleep"] { background: var(--tile-asleep-bg); color: var(--tile-asleep-fg); }
+
+.tile-time {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  font-size: 60px;
+  font-weight: 150;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.tile-clock {
+  display: inline-flex;
+  align-items: flex-start;
+}
+.strip[data-hour12="true"] .tile-time { font-size: 52px; }
+
+.tile-time .meridiem {
+  align-self: flex-start;
+  margin-top: 12px;
+  margin-left: 4px;
+  font-size: 18px;
+  font-weight: 400;
+  opacity: 0.75;
+}
+
+.tile-name {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.25;
+}
+.tile-name svg { width: 12px; height: 12px; flex: 0 0 auto; }
+.tile-sub {
+  margin-top: 2px;
+  font-size: 13.5px;
+  font-weight: 400;
+  line-height: 1.25;
+}
+
+.tile[data-state="work"]   .tile-sub { color: var(--tile-work-sub); }
+.tile[data-state="awake"]  .tile-sub { color: var(--tile-awake-sub); }
+.tile[data-state="asleep"] .tile-sub { color: var(--tile-asleep-sub); }
+
+/* Yesterday / tomorrow relative to your own day. */
+.tile-dayoff {
+  margin-bottom: 3px;
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
+
+.tile-remove {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: inherit;
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity 0.12s ease, background 0.12s ease;
+}
+.tile-remove svg { width: 11px; height: 11px; stroke-width: 1.9; }
+.tile:hover .tile-remove { opacity: 0.75; }
+.tile-remove:hover { background: rgba(0, 0, 0, 0.18); opacity: 1; }
+
+.strip-empty {
+  margin: 28px 0;
+  color: var(--toolbar-fg-dim);
+  font-size: 14px;
+}
+.strip-empty kbd {
+  padding: 1px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 4px;
+  font-family: inherit;
+}
+
+/* ------------------------------------------------------------------- map */
+.map-wrap {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--ocean);
+}
+
+.map-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.pin-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.pin {
+  position: absolute;
+  width: 0;
+  height: 0;
+  transition: opacity 0.15s ease;
+}
+
+.pin-dot {
+  position: absolute;
+  left: -4px;
+  top: -4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--pin-asleep);
+}
+.pin-arrow {
+  position: absolute;
+  left: -6px;
+  top: -6px;
+  width: 12px;
+  height: 12px;
+  color: var(--pin-asleep);
+}
+.pin-arrow svg { width: 100%; height: 100%; fill: currentColor; stroke: none; }
+
+.pin-label {
+  position: absolute;
+  left: 12px;
+  line-height: 1.2;
+  text-align: left;
+  white-space: nowrap;
+}
+.pin.flip .pin-label { left: auto; right: 12px; text-align: right; }
+
+.pin-time { font-size: 15px; font-weight: 400; color: var(--pin-asleep); }
+.pin-city { font-size: 11.5px; font-weight: 500; color: #d2d2d6; }
+.pin-country { font-size: 11px; font-weight: 400; color: #85858a; }
+
+.pin[data-state="work"] .pin-dot { background: var(--pin-work); }
+.pin[data-state="work"] .pin-arrow { color: var(--pin-work); }
+.pin[data-state="work"] .pin-time { color: var(--pin-work); }
+.pin[data-state="work"] .pin-city { color: #eaeaec; }
+
+.pin[data-state="awake"] .pin-dot { background: var(--pin-awake); }
+.pin[data-state="awake"] .pin-arrow { color: var(--pin-awake); }
+.pin[data-state="awake"] .pin-time { color: var(--pin-awake); }
+.pin[data-state="awake"] .pin-city { color: #eaeaec; }
+
+/* Beyond the projection's latitude window: clamped to the edge, so shown as
+   an approximation rather than a precise location. */
+.pin.off-map { opacity: 0.6; }
+.pin.off-map .pin-dot { border-radius: 2px; }
+
+.pin.is-hot { filter: drop-shadow(0 0 7px rgba(255, 255, 255, 0.45)); }
+.pin.is-cold { opacity: 0.38; }
+
+.share-btn {
+  position: absolute;
+  bottom: 18px;
+  left: 50%;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 34px;
+  transform: translateX(-50%);
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(58, 58, 60, 0.82);
+  color: #e4e4e6;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  transition: background 0.12s ease;
+}
+.share-btn svg { width: 19px; height: 19px; }
+.share-btn:hover { background: rgba(78, 78, 80, 0.9); }
+
+/* --------------------------------------------------------------- overlay */
+.overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 12vh;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(3px);
+  z-index: 20;
+}
+.overlay[hidden] { display: none; }
+
+.search-panel {
+  width: min(520px, calc(100% - 32px));
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  background: #2a2a2c;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+}
+
+.search-input-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 11px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.search-icon { width: 17px; height: 17px; flex: 0 0 auto; color: var(--toolbar-fg-dim); }
+
+#search-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 0;
+  background: none;
+  color: #f2f2f4;
+  font: inherit;
+  font-size: 15.5px;
+  outline: none;
+}
+#search-input::placeholder { color: var(--toolbar-fg-dim); }
+#search-input::-webkit-search-cancel-button { display: none; }
+
+.search-results {
+  max-height: min(48vh, 360px);
+  margin: 0;
+  padding: 5px;
+  overflow-y: auto;
+  list-style: none;
+}
+.search-results:empty { display: none; }
+
+.search-results li {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 7px;
+  cursor: pointer;
+}
+.search-results li[aria-selected="true"] { background: var(--accent); }
+.search-results li[aria-selected="true"] .res-country,
+.search-results li[aria-selected="true"] .res-time { color: rgba(255, 255, 255, 0.82); }
+
+.res-name { font-size: 14.5px; font-weight: 500; color: #f2f2f4; }
+.res-country { flex: 1 1 auto; font-size: 12.5px; color: var(--toolbar-fg-dim); }
+.res-time { font-size: 13.5px; color: var(--toolbar-fg-dim); }
+.res-added { font-size: 12px; color: var(--pin-work); }
+
+.search-hint { margin: 0; padding: 9px 13px 11px; color: var(--toolbar-fg-dim); font-size: 12.5px; }
+
+/* ----------------------------------------------------------------- toast */
+.toast {
+  position: fixed;
+  bottom: 62px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 8px 15px;
+  border-radius: 8px;
+  background: rgba(20, 20, 22, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #f2f2f4;
+  font-size: 13px;
+  z-index: 30;
+}
+.toast[hidden] { display: none; }
+
+/* ----------------------------------------------------------- small width */
+/* A world map cannot be both undistorted and tall on a phone, so the tiles
+   wrap into a grid and take the vertical space the map cannot use. */
+@media (max-width: 760px) {
+  body { overflow: auto; }
+
+  .app {
+    height: auto;
+    min-height: 100%;
+  }
+
+  .strip-wrap { padding: 0 10px 12px; }
+
+  .strip {
+    flex-wrap: wrap;
+    gap: 1px;
+    width: 100%;
+    overflow: visible;
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  .tile {
+    flex: 1 1 calc(50% - 1px);
+    width: auto;
+    height: 156px;
+    padding-bottom: 16px;
+    border-left: 0;
+  }
+
+  .tile-time { font-size: 42px; }
+  .strip[data-hour12="true"] .tile-time { font-size: 36px; }
+  .tile-time .meridiem { margin-top: 8px; font-size: 14px; }
+  .tile-name { font-size: 14px; }
+  .tile-sub { font-size: 12.5px; }
+
+  /* The canvas takes exactly the aspect the projection wants, so nothing is
+     letterboxed, and the share button moves into the flow underneath it. */
+  .map-wrap {
+    flex: 0 0 auto;
+    height: auto;
+    overflow: visible;
+    background: none;
+  }
+
+  .map-canvas {
+    height: 50vw;
+    min-height: 170px;
+  }
+
+  .pin-country { display: none; }
+  .pin-city { font-size: 10.5px; }
+  .pin-time { font-size: 13px; }
+
+  .share-btn {
+    position: static;
+    margin: 12px auto 16px;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; }
+}
