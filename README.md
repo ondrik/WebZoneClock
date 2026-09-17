@@ -12,11 +12,12 @@ dependencies — it is meant to be served straight off GitHub Pages.
 - **City tiles**, coloured by local hour: green during working hours
   (09:00–18:00), white in the early morning (06:00–09:00), dark grey through
   the evening and night (18:00–06:00).
-- **Time travel.** Drag the ruler along the bottom of the map and every clock,
-  tile colour and the map's shading move together, so you can find an hour
-  that is civil in all of them. The handle reads the offset from now (`+1:41`,
-  `-6:44`), blue into the future and red into the past, and its `×` snaps back
-  to now. Arrow keys nudge by 15 minutes, <kbd>Shift</kbd> by an hour.
+- **Time travel.** Drag the map itself, or the ruler along its bottom edge,
+  and every clock, tile colour and the map's shading move together, so you can
+  find an hour that is civil in all of them. The handle reads the offset from
+  now (`+1:41`, `-6:44`), blue into the future and red into the past, and its
+  `×` snaps back to now — as does double-clicking the map. Arrow keys nudge by
+  15 minutes, <kbd>Shift</kbd> by an hour.
 - **Add to calendar**, enabled once you are away from now: downloads an `.ics`
   for the selected slot with every city's local time written into the event.
 - **A home city**, marked with a locator arrow. Click any tile to move it;
@@ -87,6 +88,15 @@ the clocks keep ticking while you are away from now and the handle keeps
 reading `+1:41`. Every part of the display reads the clock through one
 function, which is what makes time travel apply uniformly.
 
+**Dragging the map** scrubs at one map width per 24 hours — 15° of longitude
+per hour, the rate the sun actually travels. Because time running forward
+carries the subsolar point west, dragging right winds the clock *back*, and
+the day/night terminator then follows the pointer exactly one-to-one: you are
+dragging the daylight itself, which is what the grab cursor promises. The
+original is about 1.4× more sensitive than this (measured off a screen
+recording at 34 hours per window width, R² = 0.99); the round number was
+preferred here for the terminator-tracking property.
+
 Three other parts are worth knowing about:
 
 **The projection.** Longitude always spans the full 360°; the latitude window
@@ -156,8 +166,8 @@ endorsed by, or derived from the code of World Clock Pro or its publisher.
 - Working hours are hardcoded to 09:00–18:00 local for every city, and are not
   weekend-aware. The three colour bands were read off the original app by
   scrubbing its timeline and checking where each tile changed.
-- The timeline spans one day either side of now. The original slides its ruler
-  indefinitely; this one has fixed ends, which keeps dragging predictable at
-  the cost of a longer reach.
+- The timeline spans one day either side of now, and map dragging is clamped
+  to the same range. The original slides its ruler indefinitely; this one has
+  fixed ends, which keeps dragging predictable at the cost of a longer reach.
 - Calendar events are a fixed 30 minutes, and are downloaded as a file rather
   than written into a calendar account.

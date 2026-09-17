@@ -57,6 +57,8 @@ const map = new WorldMap(el.map);
 const pins = new PinLayer(el.pins);
 
 let timeline = null;
+// Active map-drag gesture, or null. See bindMapDrag.
+let mapDrag = null;
 // Offset from real time, in ms, set by the timeline. Deliberately not
 // persisted: a reload should land you back at "now".
 let travelMs = 0;
@@ -102,6 +104,7 @@ async function main() {
   bindSearch();
   bindStripInteractions();
   bindTimebar();
+  bindMapDrag();
 
   const ro = new ResizeObserver(() => {
     map.resize();
@@ -156,6 +159,7 @@ function renderAll(force) {
   lastEntries = entries;
   renderStrip(entries);
   map.draw(now, state.daylight);
+  syncPinInset(false);
   pins.render(entries, map);
 
   timeline?.render(realNow(), homeTimezone(), state.hour12);
@@ -377,29 +381,114 @@ function bindTimebar() {
   const REVEAL_ZONE = 130; // px from the bottom edge
 
   el.mapWrap.addEventListener('pointermove', (e) => {
-    if (e.pointerType !== 'mouse') return;
+    if (e.pointerType !== 'mouse' || mapDrag) return;
     const rect = el.mapWrap.getBoundingClientRect();
-    const near = e.clientY > rect.bottom - REVEAL_ZONE;
-    el.mapWrap.classList.toggle('reveal', near);
-    el.reveal.setAttribute('aria-expanded', String(near));
+    setRevealed(e.clientY > rect.bottom - REVEAL_ZONE);
   });
 
   el.mapWrap.addEventListener('pointerleave', () => {
-    if (timeline?.dragging) return;
-    el.mapWrap.classList.remove('reveal');
-    el.reveal.setAttribute('aria-expanded', 'false');
+    if (timeline?.dragging || mapDrag) return;
+    setRevealed(false);
   });
 
   el.reveal.addEventListener('click', () => {
-    const on = !el.mapWrap.classList.contains('reveal');
-    el.mapWrap.classList.toggle('reveal', on);
-    el.reveal.setAttribute('aria-expanded', String(on));
+    setRevealed(!el.mapWrap.classList.contains('reveal'));
   });
 
   // Re-tick the ruler labels when the box changes width.
   new ResizeObserver(() => timeline?.render(realNow(), homeTimezone(), state.hour12)).observe(
     el.ruler,
   );
+}
+
+function setRevealed(on) {
+  el.mapWrap.classList.toggle('reveal', on);
+  el.reveal.setAttribute('aria-expanded', String(on));
+  syncPinInset();
+}
+
+/**
+ * Keep pin labels out from under the time bar.
+ *
+ * Whether the bar is up is taken from state rather than from its opacity,
+ * which is mid-transition exactly when this runs. Whether it *overlays* the
+ * map is measured, because on narrow viewports it sits below the map instead
+ * and there is nothing to avoid.
+ */
+function syncPinInset(relayout = true) {
+  const shown = el.mapWrap.classList.contains('reveal') || travelMs !== 0;
+  const overlays = getComputedStyle(el.timebar).position === 'absolute';
+
+  let overlap = 0;
+  if (shown && overlays) {
+    const mapRect = el.mapWrap.getBoundingClientRect();
+    const barRect = el.timebar.getBoundingClientRect();
+    overlap = Math.max(0, mapRect.bottom - barRect.top);
+  }
+
+  const changed = pins.setBottomInset(overlap);
+  if (changed && relayout && lastEntries.length) pins.layout(lastEntries, map);
+}
+
+/**
+ * Dragging the map scrubs time.
+ *
+ * The gain is one map width per 24 hours — that is, 15 degrees of longitude
+ * per hour, the rate the sun actually travels. Because time running forward
+ * carries the subsolar point west, dragging right winds the clock back, and
+ * the day/night terminator follows the pointer exactly one-to-one: you are
+ * dragging the daylight itself, which is what the grab cursor promises.
+ */
+function bindMapDrag() {
+  const THRESHOLD = 3; // px of travel before this counts as a drag, not a click
+
+  el.mapWrap.addEventListener('pointerdown', (e) => {
+    // Leave the time bar's own controls alone.
+    if (e.target.closest('.timebar, .share-btn')) return;
+    if (e.button !== undefined && e.button !== 0) return;
+
+    mapDrag = {
+      id: e.pointerId,
+      startX: e.clientX,
+      startOffset: travelMs,
+      width: map.proj.rect.w || el.mapWrap.clientWidth,
+      moved: false,
+    };
+    el.mapWrap.setPointerCapture(e.pointerId);
+  });
+
+  el.mapWrap.addEventListener('pointermove', (e) => {
+    if (!mapDrag || e.pointerId !== mapDrag.id) return;
+
+    const dx = e.clientX - mapDrag.startX;
+    if (!mapDrag.moved) {
+      if (Math.abs(dx) < THRESHOLD) return;
+      mapDrag.moved = true;
+      el.mapWrap.classList.add('scrubbing');
+      setRevealed(true); // so the offset is visible while dragging
+    }
+
+    const deltaMs = -(dx / mapDrag.width) * 86400000;
+    timeline.set(Math.round((mapDrag.startOffset + deltaMs) / 60000) * 60000);
+    e.preventDefault();
+  });
+
+  const finish = (e) => {
+    if (!mapDrag || (e.pointerId !== undefined && e.pointerId !== mapDrag.id)) return;
+    if (el.mapWrap.hasPointerCapture?.(mapDrag.id)) {
+      el.mapWrap.releasePointerCapture(mapDrag.id);
+    }
+    mapDrag = null;
+    el.mapWrap.classList.remove('scrubbing');
+  };
+  el.mapWrap.addEventListener('pointerup', finish);
+  el.mapWrap.addEventListener('pointercancel', finish);
+
+  // Double-click the map to come back to now.
+  el.mapWrap.addEventListener('dblclick', (e) => {
+    if (e.target.closest('.timebar, .share-btn')) return;
+    timeline.set(0);
+  });
 }
 
 function syncSegmented() {

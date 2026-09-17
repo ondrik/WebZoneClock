@@ -24,6 +24,17 @@ export class PinLayer {
   constructor(el) {
     this.el = el;
     this.nodes = new Map(); // city id -> node bundle
+    // Height at the bottom of the map that something else is covering (the
+    // time bar), and which labels must therefore stay clear of.
+    this.bottomInset = 0;
+  }
+
+  /** Returns true if the inset actually changed, so callers can skip a relayout. */
+  setBottomInset(px) {
+    const next = Math.max(0, Math.round(px));
+    if (next === this.bottomInset) return false;
+    this.bottomInset = next;
+    return true;
   }
 
   /**
@@ -55,8 +66,15 @@ export class PinLayer {
   }
 
   layout(entries, map) {
-    // Labels are kept inside the map band, not the letterbox around it.
-    const bounds = map.proj.rect;
+    // Labels are kept inside the map band, not the letterbox around it, and
+    // out from under whatever is overlaying its bottom edge.
+    const rect = map.proj.rect;
+    const bounds = {
+      x: rect.x,
+      y: rect.y,
+      w: rect.w,
+      h: Math.max(40, rect.h - this.bottomInset),
+    };
     if (!bounds.w || !bounds.h) return;
 
     // Anchor every pin first, so the solver can route labels around all the

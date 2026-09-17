@@ -283,7 +283,17 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round
   min-height: 0;
   overflow: hidden;
   background: var(--ocean);
+  /* Drag the map sideways to scrub time; vertical gestures still scroll. */
+  cursor: grab;
+  touch-action: pan-y;
 }
+.map-wrap.scrubbing { cursor: grabbing; }
+.map-wrap.scrubbing .pin { transition: none; }
+
+/* The controls inside keep their own cursors. */
+.timebar, .share-btn { cursor: default; }
+.share-btn, .tb-btn, .handle-clear { cursor: pointer; }
+.ruler { cursor: ew-resize; }
 
 .map-canvas {
   display: block;
