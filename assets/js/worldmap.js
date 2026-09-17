@@ -9,16 +9,15 @@
 
 import { makeProjection } from './geo.js';
 import { subsolarPoint, solarElevation } from './solar.js';
-
-const BACKDROP = '#1b1b1d'; // shown in the letterbox bands, matches the page
-const OCEAN = '#1b2532';
-const LAND = '#6a6a6c';
+import { mapColors } from './themes.js';
 
 // Night shading: fully lit above DAY_ELEV, fully dark below NIGHT_ELEV, with a
 // soft twilight ramp between them.
 const DAY_ELEV = 4;
 const NIGHT_ELEV = -8;
-const NIGHT_ALPHA = 0.33;
+
+const HALFTONE_PITCH = 7; // px between dot centres
+const GRATICULE_STEP = 20; // degrees between engraved graticule lines
 
 const GRID_W = 480;
 const GRID_H = 240;
@@ -60,16 +59,18 @@ export class WorldMap {
     this.proj = makeProjection(w, h);
   }
 
-  draw(now, showDaylight) {
+  /** `mode` is the active theme's map style: filled, soft, engraved, halftone. */
+  draw(now, showDaylight, mode = 'filled') {
     const { ctx, width: w, height: h } = this;
     if (!w || !h) return;
 
     const { rect } = this.proj;
+    const colors = mapColors();
 
     ctx.clearRect(0, 0, w, h);
-    ctx.fillStyle = BACKDROP;
+    ctx.fillStyle = colors.backdrop;
     ctx.fillRect(0, 0, w, h);
-    ctx.fillStyle = OCEAN;
+    ctx.fillStyle = colors.ocean;
     ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
 
     // Everything else stays inside the map band.
@@ -78,42 +79,141 @@ export class WorldMap {
     ctx.rect(rect.x, rect.y, rect.w, rect.h);
     ctx.clip();
 
-    if (this.land) this.drawLand();
-    if (showDaylight) this.drawNight(now);
+    if (mode === 'engraved') this.drawGraticule(colors);
+
+    if (this.land) {
+      if (mode === 'engraved') this.strokeLand(colors);
+      else if (mode === 'halftone') this.stippleLand(colors);
+      else this.fillLand(colors);
+    }
+
+    if (showDaylight) this.drawNight(now, colors);
 
     ctx.restore();
   }
 
-  drawLand() {
-    const { ctx, proj } = this;
-    ctx.fillStyle = LAND;
-
+  /** Walk every land ring once, handing each to `plot`. */
+  eachRing(plot) {
+    const { proj } = this;
     for (const polygon of this.land) {
       // Rings are stored with continuous (unwrapped) longitudes, so a shape
       // straddling the antimeridian runs past +/-180 instead of snapping back
       // across the map. Drawing it shifted by a full turn either way brings
       // the wrapped half in at the opposite edge; the canvas clips the rest.
       for (const shift of polygon.shifts) {
-        ctx.beginPath();
-        for (const ring of polygon.rings) {
-          for (let i = 0; i < ring.length; i += 2) {
-            const x = proj.x(ring[i] + shift);
-            const y = proj.y(ring[i + 1]);
-            if (i === 0) ctx.moveTo(x, y);
-            else ctx.lineTo(x, y);
-          }
-          ctx.closePath();
-        }
-        // Rings after the first are holes (lakes); even-odd cuts them out.
-        ctx.fill('evenodd');
+        plot(polygon.rings, shift, proj);
       }
     }
   }
 
-  drawNight(now) {
+  tracePolygon(rings, shift, proj) {
+    const { ctx } = this;
+    ctx.beginPath();
+    for (const ring of rings) {
+      for (let i = 0; i < ring.length; i += 2) {
+        const x = proj.x(ring[i] + shift);
+        const y = proj.y(ring[i + 1]);
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+    }
+  }
+
+  fillLand(colors) {
+    const { ctx } = this;
+    ctx.fillStyle = colors.land;
+    this.eachRing((rings, shift, proj) => {
+      this.tracePolygon(rings, shift, proj);
+      // Rings after the first are holes (lakes); even-odd cuts them out.
+      ctx.fill('evenodd');
+    });
+  }
+
+  /** Coastlines as hairlines over open ground, the way a chart is engraved. */
+  strokeLand(colors) {
+    const { ctx } = this;
+    ctx.save();
+    ctx.strokeStyle = colors.line;
+    ctx.lineWidth = 0.9;
+    ctx.lineJoin = 'round';
+    this.eachRing((rings, shift, proj) => {
+      this.tracePolygon(rings, shift, proj);
+      ctx.stroke();
+    });
+    ctx.restore();
+  }
+
+  /** Land as a field of printed dots. */
+  stippleLand(colors) {
+    const { ctx } = this;
+    const { rect } = this.proj;
+
+    // Draw the landmass to an offscreen mask, then read it back to decide
+    // where a dot belongs — far simpler than testing point-in-polygon.
+    const mask = document.createElement('canvas');
+    mask.width = Math.max(1, Math.round(rect.w));
+    mask.height = Math.max(1, Math.round(rect.h));
+    const mctx = mask.getContext('2d', { willReadFrequently: true });
+
+    mctx.translate(-rect.x, -rect.y);
+    mctx.fillStyle = '#000';
+    const saved = this.ctx;
+    this.ctx = mctx;
+    this.eachRing((rings, shift, proj) => {
+      this.tracePolygon(rings, shift, proj);
+      mctx.fill('evenodd');
+    });
+    this.ctx = saved;
+
+    const data = mctx.getImageData(0, 0, mask.width, mask.height).data;
+    ctx.fillStyle = colors.land;
+
+    for (let y = HALFTONE_PITCH / 2; y < mask.height; y += HALFTONE_PITCH) {
+      for (let x = HALFTONE_PITCH / 2; x < mask.width; x += HALFTONE_PITCH) {
+        const i = ((y | 0) * mask.width + (x | 0)) * 4 + 3;
+        if (data[i] < 128) continue;
+        ctx.beginPath();
+        ctx.arc(rect.x + x, rect.y + y, HALFTONE_PITCH * 0.32, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+
+  /** Meridians and parallels, for the chart-like themes. */
+  drawGraticule(colors) {
+    const { ctx, proj } = this;
+    const { rect } = proj;
+
+    ctx.save();
+    ctx.strokeStyle = colors.graticule;
+    ctx.lineWidth = 0.7;
+
+    for (let lon = -180; lon <= 180; lon += GRATICULE_STEP) {
+      const x = proj.x(lon);
+      ctx.beginPath();
+      ctx.moveTo(x, rect.y);
+      ctx.lineTo(x, rect.y + rect.h);
+      ctx.stroke();
+    }
+    for (let lat = -80; lat <= 80; lat += GRATICULE_STEP) {
+      const y = proj.y(lat);
+      if (y < rect.y || y > rect.y + rect.h) continue;
+      ctx.beginPath();
+      ctx.moveTo(rect.x, y);
+      ctx.lineTo(rect.x + rect.w, y);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  drawNight(now, colors) {
     const sub = subsolarPoint(now);
     const data = this.shadeData.data;
     const { latTop, latBottom } = this.proj;
+    // Night is tinted rather than simply black, so a pale theme dims towards
+    // its own indigo instead of going muddy.
+    const [nr, ng, nb] = parseRgbTriplet(colors.night);
 
     for (let gy = 0; gy < GRID_H; gy++) {
       // Sample at cell centres so the edges of the grid stay put when scaled.
@@ -127,10 +227,10 @@ export class WorldMap {
         const eased = t * t * (3 - 2 * t); // smoothstep
 
         const i = (gy * GRID_W + gx) * 4;
-        data[i] = 0;
-        data[i + 1] = 0;
-        data[i + 2] = 0;
-        data[i + 3] = Math.round(eased * NIGHT_ALPHA * 255);
+        data[i] = nr;
+        data[i + 1] = ng;
+        data[i + 2] = nb;
+        data[i + 3] = Math.round(eased * colors.nightAlpha * 255);
       }
     }
 
@@ -200,6 +300,13 @@ function unwrapPolygon(rings) {
   }
 
   return { rings: unwrapped, shifts };
+}
+
+/** "27 42 74" -> [27, 42, 74]; falls back to black. */
+function parseRgbTriplet(value) {
+  const nums = String(value).match(/\d+/g);
+  if (!nums || nums.length < 3) return [0, 0, 0];
+  return [Number(nums[0]), Number(nums[1]), Number(nums[2])];
 }
 
 function clamp(v, lo, hi) {

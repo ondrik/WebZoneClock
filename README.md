@@ -9,9 +9,21 @@ dependencies — it is meant to be served straight off GitHub Pages.
 
 ## What it does
 
-- **City tiles**, coloured by local hour: green during working hours
-  (09:00–18:00), white in the early morning (06:00–09:00), dark grey through
-  the evening and night (18:00–06:00).
+- **Five looks**, switched from the picker in the toolbar and remembered
+  between visits. They are not recolourings of one layout: each builds the city
+  strip and draws the map its own way.
+
+  | Look | The strip | The map |
+  | --- | --- | --- |
+  | **Daylight** | A row per city showing its whole day as real sunlight | Pale, tinted indigo at night |
+  | **Orrery** | A brass 24-hour dial per city, day drawn as an arc | Hairline coastlines over a graticule |
+  | **Solari** | A split-flap departure board | Charcoal landmasses |
+  | **Two-ink** | Oversized printed numerals, teal and coral | Halftone dots |
+  | **Classic** | The original filled tiles | Solid grey landmasses |
+
+- **A three-state reading of each city's hour**: working (09:00–18:00), early
+  (06:00–09:00), or evening and night. Each look expresses it differently —
+  as a whole colour, an ink, or where the hand sits on a dial.
 - **Time travel.** Drag the map itself, or the ruler along its bottom edge,
   and every clock, tile colour and the map's shading move together, so you can
   find an hour that is civil in all of them. The handle reads the offset from
@@ -78,6 +90,9 @@ the "Source" link in the toolbar.
 | `worldmap.js` | Canvas: land, day/night shading, city → pixel |
 | `pins.js` | Map markers and the label placement solver |
 | `citydb.js` | Loading, searching and ranking the city database |
+| `themes.js` | The five looks, their tokens and their webfonts |
+| `strip.js` | Building the city strip in each look's own layout |
+| `daylight.js` | Solar elevation across a city's day; sunrise and sunset |
 | `timeline.js` | The time-travel ruler: ticks, day bands, drag and keyboard |
 | `calendar.js` | Building the `.ics` invitation |
 | `state.js` | The city list, persistence, and share-link encoding |
@@ -114,6 +129,13 @@ so interpolating is indistinguishable from solving per pixel and much cheaper.
 Land is drawn lit and then darkened, with a soft twilight ramp between +4° and
 −8° of elevation.
 
+**The sunlight bands** are not the three office-hours buckets stretched out.
+`daylight.js` samples the sun's real elevation across a city's local
+midnight-to-midnight and hands back both a gradient and the sunrise and sunset
+crossings, so a band shows the day that city actually gets. It stays honest at
+high latitudes: a polar summer never crosses the horizon, so the band never
+goes dark, and `sunEvents` reports that rather than inventing a sunrise.
+
 **Label placement.** A pin is anchored at its city's exact coordinates and
 never moves; only its label does. Each label tries a series of offsets — beside
 the dot, then progressively above or below on either side — and takes the first
@@ -121,6 +143,11 @@ that clears every label and every dot already placed. Cities are placed in
 descending population order, so when something has to give, it is the smaller
 town that moves. If nothing fits, the label takes its preferred spot and
 overlaps rather than disappearing.
+
+Adding a look means one entry in `THEMES` and one block of tokens in
+`assets/css/themes.css`; it only needs new code if it wants a strip layout or
+a map style that does not exist yet. Webfonts are fetched per theme rather than
+all at once, so carrying five faces costs one stylesheet at a time.
 
 `data/` is generated and checked in; see [`tools/README.md`](tools/README.md)
 to regenerate it.

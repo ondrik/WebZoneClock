@@ -1,0 +1,503 @@
+/* ============================================================== palettes
+   One block of tokens per theme, then the layout each strip style needs.
+   ====================================================================== */
+
+/* ---- Daylight: cool paper, indigo night, the sun's own warmth as data --- */
+[data-theme="daylight"] {
+  --bg: #eef1f6;
+  --surface: #ffffff;
+  --fg: #16202e;
+  --fg-soft: #46576e;
+  --fg-mute: #7a8a9e;
+  --line: #d6dde7;
+  --accent: #1f5fd0;
+  --accent-fg: #ffffff;
+  --past: #c2402f;
+  --past-fg: #ffffff;
+
+  --font-ui: Archivo, system-ui, sans-serif;
+  --font-display: Fraunces, Georgia, serif;
+
+  --control-bg: #e2e8f1;
+  --control-bg-hover: #d3dce8;
+  --control-line: #cdd6e2;
+  --menu-bg: #ffffff;
+  --menu-line: #dde4ec;
+  --float-bg: rgba(255, 255, 255, 0.92);
+  --scrim: rgba(22, 32, 46, 0.34);
+
+  --band-night: 27 42 74;
+  --band-day: 255 228 168;
+  --band-now: #16202e;
+  --band-now-halo: rgba(255, 255, 255, 0.85);
+  --band-sun: rgba(22, 32, 46, 0.28);
+
+  --ruler-bg: linear-gradient(to top, rgba(22, 32, 46, 0.09), transparent);
+  --tick: rgba(22, 32, 46, 0.22);
+  --tick-strong: rgba(22, 32, 46, 0.38);
+  --tick-day: rgba(22, 32, 46, 0.12);
+  --handle-bg: #46576e;
+  --handle-fg: #ffffff;
+
+  --map-backdrop: #eef1f6;
+  --map-ocean: #e3e9f1;
+  --map-land: #a3b3c8;
+  --map-line: #8fa0b6;
+  --map-graticule: rgba(22, 32, 46, 0.07);
+  --map-night: 27 42 74;
+  --map-night-alpha: 0.26;
+
+  --pin-halo: rgba(255, 255, 255, 0.85);
+  --pin-work: #17479c;
+  --pin-early: #a8601c;
+  --pin-dim: #4c5d73;
+  --pin-city: #16202e;
+  --pin-country: #7a8a9e;
+  --pin-glow: rgba(31, 95, 208, 0.5);
+}
+
+/* ---- Orrery: ink, brass and verdigris; an instrument, not an app -------- */
+[data-theme="orrery"] {
+  --bg: #0d1218;
+  --surface: #141c25;
+  --fg: #e6dfcf;
+  --fg-soft: #a9a294;
+  --fg-mute: #7d8691;
+  --line: #24303d;
+  --accent: #c2954a;
+  --accent-fg: #14100a;
+  --past: #a85c3c;
+  --past-fg: #14100a;
+
+  --font-ui: Inter, system-ui, sans-serif;
+  --font-display: Spectral, Georgia, serif;
+
+  --control-bg: rgba(230, 223, 207, 0.07);
+  --control-bg-hover: rgba(230, 223, 207, 0.14);
+  --control-line: rgba(194, 149, 74, 0.28);
+  --menu-bg: #141c25;
+  --menu-line: rgba(194, 149, 74, 0.24);
+  --float-bg: rgba(20, 28, 37, 0.9);
+  --scrim: rgba(6, 9, 13, 0.6);
+
+  --band-night: 13 18 24;
+  --band-day: 194 149 74;
+  --band-now: #e6dfcf;
+  --band-now-halo: rgba(13, 18, 24, 0.8);
+  --band-sun: rgba(230, 223, 207, 0.3);
+
+  --ruler-bg: linear-gradient(to top, rgba(0, 0, 0, 0.5), transparent);
+  --tick: rgba(230, 223, 207, 0.24);
+  --tick-strong: rgba(194, 149, 74, 0.55);
+  --tick-day: rgba(194, 149, 74, 0.16);
+  --handle-bg: #3a4653;
+  --handle-fg: #e6dfcf;
+
+  --map-backdrop: #0d1218;
+  --map-ocean: #0d1218;
+  --map-land: #0d1218;
+  --map-line: #85a49e;
+  --map-graticule: rgba(194, 149, 74, 0.13);
+  --map-night: 0 0 0;
+  --map-night-alpha: 0.42;
+
+  --pin-halo: rgba(13, 18, 24, 0.85);
+  --pin-work: #d0a75c;
+  --pin-early: #4f9c86;
+  --pin-dim: #8b95a1;
+  --pin-city: #e6dfcf;
+  --pin-country: #7d8691;
+  --pin-glow: rgba(194, 149, 74, 0.55);
+}
+
+/* ---- Solari: charcoal cells, amber flaps ------------------------------- */
+[data-theme="solari"] {
+  --bg: #0b0b0c;
+  --surface: #1c1c1f;
+  --fg: #e9e6de;
+  --fg-soft: #a5a29a;
+  --fg-mute: #75736d;
+  --line: #2c2c30;
+  --accent: #e8a72c;
+  --accent-fg: #17140c;
+  --past: #b2483c;
+  --past-fg: #ffffff;
+
+  --font-ui: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
+  --font-display: "Barlow Condensed", "Arial Narrow", sans-serif;
+
+  --control-bg: rgba(233, 230, 222, 0.08);
+  --control-bg-hover: rgba(233, 230, 222, 0.16);
+  --control-line: rgba(233, 230, 222, 0.16);
+  --menu-bg: #1c1c1f;
+  --menu-line: #34343a;
+  --float-bg: rgba(28, 28, 31, 0.93);
+  --scrim: rgba(0, 0, 0, 0.6);
+
+  --band-night: 44 44 50;
+  --band-day: 232 167 44;
+  --band-now: #e9e6de;
+  --band-now-halo: rgba(0, 0, 0, 0.7);
+  --band-sun: rgba(233, 230, 222, 0.32);
+
+  --ruler-bg: linear-gradient(to top, rgba(0, 0, 0, 0.6), transparent);
+  --tick: rgba(233, 230, 222, 0.22);
+  --tick-strong: rgba(232, 167, 44, 0.5);
+  --tick-day: rgba(233, 230, 222, 0.1);
+  --handle-bg: #4a4a50;
+  --handle-fg: #e9e6de;
+
+  --map-backdrop: #0b0b0c;
+  --map-ocean: #131315;
+  --map-land: #3a3a3e;
+  --map-line: #55555b;
+  --map-graticule: rgba(233, 230, 222, 0.06);
+  --map-night: 0 0 0;
+  --map-night-alpha: 0.4;
+
+  --pin-halo: rgba(11, 11, 12, 0.85);
+  --pin-work: #e8a72c;
+  --pin-early: #cfc6b0;
+  --pin-dim: #8a8781;
+  --pin-city: #e9e6de;
+  --pin-country: #75736d;
+  --pin-glow: rgba(232, 167, 44, 0.5);
+}
+
+/* ---- Two-ink: teal and coral on cool stock ----------------------------- */
+[data-theme="riso"] {
+  --bg: #e7ebe6;
+  --surface: #dfe4de;
+  --fg: #0d3d3a;
+  --fg-soft: #2d5f5b;
+  --fg-mute: #6d8a86;
+  --line: #c3cdc6;
+  --accent: #ff5545;
+  --accent-fg: #ffffff;
+  --past: #0d5c57;
+  --past-fg: #ffffff;
+
+  --font-ui: "Bricolage Grotesque", system-ui, sans-serif;
+  --font-display: "Bricolage Grotesque", system-ui, sans-serif;
+
+  --control-bg: rgba(13, 92, 87, 0.1);
+  --control-bg-hover: rgba(13, 92, 87, 0.2);
+  --control-line: rgba(13, 92, 87, 0.26);
+  --menu-bg: #eff2ee;
+  --menu-line: rgba(13, 92, 87, 0.22);
+  --float-bg: rgba(239, 242, 238, 0.94);
+  --scrim: rgba(13, 61, 58, 0.34);
+
+  --band-night: 13 92 87;
+  --band-day: 255 85 69;
+  --band-now: #0d3d3a;
+  --band-now-halo: rgba(231, 235, 230, 0.9);
+  --band-sun: rgba(13, 61, 58, 0.3);
+
+  --ruler-bg: linear-gradient(to top, rgba(13, 92, 87, 0.14), transparent);
+  --tick: rgba(13, 92, 87, 0.3);
+  --tick-strong: rgba(13, 92, 87, 0.5);
+  --tick-day: rgba(13, 92, 87, 0.16);
+  --handle-bg: #0d5c57;
+  --handle-fg: #ffffff;
+
+  --map-backdrop: #e7ebe6;
+  --map-ocean: #e7ebe6;
+  --map-land: #0d5c57;
+  --map-line: #0d5c57;
+  --map-graticule: rgba(13, 92, 87, 0.12);
+  --map-night: 13 92 87;
+  --map-night-alpha: 0.22;
+
+  --pin-halo: rgba(231, 235, 230, 0.92);
+  --pin-work: #e2331f;
+  --pin-early: #0d5c57;
+  --pin-dim: #3f605c;
+  --pin-city: #0d3d3a;
+  --pin-country: #6d8a86;
+  --pin-glow: rgba(255, 85, 69, 0.5);
+}
+
+/* ---- Classic: the original ------------------------------------------- */
+[data-theme="classic"] {
+  --bg: #1b1b1d;
+  --surface: #3c3c3e;
+  --fg: #d8d8da;
+  --fg-soft: #9a9a9e;
+  --fg-mute: #8a8a8e;
+  --line: rgba(255, 255, 255, 0.09);
+  --accent: #0a84ff;
+  --accent-fg: #ffffff;
+  --past: #ff453a;
+  --past-fg: #ffffff;
+
+  --font-ui: Inter, system-ui, sans-serif;
+  --font-display: Inter, system-ui, sans-serif;
+
+  --control-bg: rgba(255, 255, 255, 0.07);
+  --control-bg-hover: rgba(255, 255, 255, 0.14);
+  --control-line: rgba(255, 255, 255, 0.14);
+  --menu-bg: #2a2a2c;
+  --menu-line: rgba(255, 255, 255, 0.1);
+  --float-bg: rgba(58, 58, 60, 0.82);
+  --scrim: rgba(0, 0, 0, 0.5);
+
+  --band-night: 28 28 30;
+  --band-day: 159 201 46;
+  --band-now: #ffffff;
+  --band-now-halo: rgba(0, 0, 0, 0.6);
+  --band-sun: rgba(255, 255, 255, 0.3);
+
+  --ruler-bg: linear-gradient(to top, rgba(0, 0, 0, 0.55), transparent);
+  --tick: rgba(255, 255, 255, 0.22);
+  --tick-strong: rgba(255, 255, 255, 0.34);
+  --tick-day: rgba(255, 255, 255, 0.14);
+  --handle-bg: rgba(120, 120, 124, 0.95);
+  --handle-fg: #ffffff;
+
+  --map-backdrop: #1b1b1d;
+  --map-ocean: #1b2532;
+  --map-land: #6a6a6c;
+  --map-line: #6a6a6c;
+  --map-graticule: rgba(255, 255, 255, 0.07);
+  --map-night: 0 0 0;
+  --map-night-alpha: 0.33;
+
+  --pin-halo: rgba(0, 0, 0, 0.55);
+  --pin-work: #9fc92e;
+  --pin-early: #f2f2f4;
+  --pin-dim: #7c7c80;
+  --pin-city: #d2d2d6;
+  --pin-country: #85858a;
+  --pin-glow: rgba(255, 255, 255, 0.45);
+}
+
+/* Pin labels sit over land, dots and halftone; a halo keeps them legible. */
+.pin-time, .pin-city, .pin-country { text-shadow: 0 0 3px var(--pin-halo), 0 0 6px var(--pin-halo); }
+
+/* A glow is not enough against a field of printed dots, so the two-ink map
+   gives its labels a plate of the paper itself. */
+[data-theme="riso"] .pin-label {
+  padding: 2px 6px 3px;
+  border-radius: 3px;
+  background: rgba(231, 235, 230, 0.86);
+}
+[data-theme="riso"] .pin-time,
+[data-theme="riso"] .pin-city,
+[data-theme="riso"] .pin-country { text-shadow: none; }
+
+/* ====================================================== strip: tiles ==== */
+[data-strip="tiles"] .strip {
+  border-radius: var(--radius);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+}
+[data-strip="tiles"] .city {
+  flex: 0 0 196px;
+  width: 196px;
+  height: 242px;
+  border-left: 1px solid var(--line);
+}
+[data-strip="tiles"] .city:first-child { border-left: 0; }
+[data-strip="tiles"] .tile {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 0 8px 22px;
+  text-align: center;
+  background: var(--surface);
+  color: var(--fg);
+}
+[data-strip="tiles"] .city[data-state="work"] .tile { background: #9fc92e; color: #fff; }
+[data-strip="tiles"] .city[data-state="early"] .tile { background: #fff; color: #1c1c1e; }
+[data-strip="tiles"] .tile-time {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-size: 60px;
+  font-weight: 150;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+[data-strip="tiles"] .strip[data-hour12="true"] .tile-time { font-size: 52px; }
+[data-strip="tiles"] .city-name { justify-content: center; font-size: 15px; font-weight: 500; }
+[data-strip="tiles"] .city-sub { margin-top: 2px; font-size: 13.5px; opacity: 0.72; }
+[data-strip="tiles"] .city-dayoff {
+  position: absolute;
+  top: 12px;
+  left: 0;
+  width: 100%;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.07em;
+  text-align: center;
+  text-transform: uppercase;
+  opacity: 0.55;
+}
+
+/* ====================================================== strip: bands ==== */
+[data-strip="bands"] .strip-wrap { padding-bottom: 10px; }
+[data-strip="bands"] .strip {
+  flex-direction: column;
+  gap: 1px;
+  width: min(940px, 100%);
+  padding: 6px;
+  overflow: visible;
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: 0 1px 0 var(--line), 0 12px 30px rgba(22, 32, 46, 0.09);
+}
+[data-strip="bands"] .band-row {
+  display: grid;
+  grid-template-columns: 172px 1fr 116px;
+  align-items: center;
+  gap: 16px;
+  padding: 9px 12px;
+  border-radius: 7px;
+}
+[data-strip="bands"] .band-row:hover { background: var(--control-bg); }
+[data-strip="bands"] .city-name { font-size: 15px; font-weight: 600; }
+[data-strip="bands"] .city-sub { font-size: 12.5px; color: var(--fg-mute); }
+[data-strip="bands"] .band { height: 30px; }
+[data-strip="bands"] .band-tail { text-align: right; }
+[data-strip="bands"] .band-time {
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 400;
+  line-height: 1.05;
+}
+[data-strip="bands"] .city-dayoff { font-size: 11px; color: var(--fg-mute); }
+[data-strip="bands"] .city-remove { top: 50%; left: -2px; margin-top: -10px; }
+
+/* ====================================================== strip: dials ==== */
+[data-strip="dials"] .strip { gap: 0; }
+[data-strip="dials"] .city {
+  flex: 0 0 150px;
+  width: 150px;
+  padding: 16px 8px 18px;
+  border-left: 1px solid var(--line);
+  text-align: center;
+}
+[data-strip="dials"] .city:first-child { border-left: 0; }
+[data-strip="dials"] .dial { display: block; width: 80px; height: 80px; margin: 0 auto 10px; }
+[data-strip="dials"] .dial-rim { fill: none; stroke: var(--line); stroke-width: 1; }
+[data-strip="dials"] .dial-day,
+[data-strip="dials"] .dial-day-full { fill: rgb(var(--band-day) / 0.22); stroke: none; }
+[data-strip="dials"] .dial-tick { stroke: var(--fg-mute); stroke-width: 1; }
+[data-strip="dials"] .dial-hand { stroke: var(--accent); stroke-width: 1.6; }
+[data-strip="dials"] .dial-hub { fill: var(--accent); stroke: none; }
+[data-strip="dials"] .city[data-state="asleep"] .dial-hand,
+[data-strip="dials"] .city[data-state="asleep"] .dial-hub { stroke: var(--fg-mute); fill: var(--fg-mute); }
+[data-strip="dials"] .dial-time {
+  font-family: var(--font-display);
+  font-size: 38px;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0.01em;
+}
+[data-strip="dials"] .city-name {
+  justify-content: center;
+  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 500;
+}
+[data-strip="dials"] .city-sub { font-size: 11.5px; color: var(--fg-mute); }
+[data-strip="dials"] .city-dayoff { margin-top: 4px; font-size: 10.5px; color: var(--accent); }
+
+/* ====================================================== strip: board ==== */
+[data-strip="board"] .strip {
+  flex-direction: column;
+  gap: 2px;
+  width: min(880px, 100%);
+  padding: 8px;
+  overflow: visible;
+  border-radius: 4px;
+  background: #000;
+}
+[data-strip="board"] .board-row {
+  display: grid;
+  grid-template-columns: 116px 1fr 124px 74px 124px;
+  align-items: stretch;
+  gap: 2px;
+}
+[data-strip="board"] .board-cell {
+  display: flex;
+  align-items: center;
+  padding: 7px 10px;
+  background: var(--surface);
+  /* the seam across a split-flap cell */
+  box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.55);
+}
+[data-strip="board"] .board-time {
+  justify-content: flex-end;
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--accent);
+  letter-spacing: 0.01em;
+}
+[data-strip="board"] .city[data-state="asleep"] .board-time { color: var(--fg-soft); }
+[data-strip="board"] .board-name { flex-direction: column; align-items: flex-start; gap: 0; }
+[data-strip="board"] .city-name { font-size: 19px; font-weight: 500; letter-spacing: 0.02em; }
+[data-strip="board"] .board-country,
+[data-strip="board"] .board-zone { font-size: 15px; color: var(--fg-soft); }
+[data-strip="board"] .board-zone { justify-content: flex-end; }
+[data-strip="board"] .board-bar { padding: 7px; }
+[data-strip="board"] .band { width: 100%; height: 100%; min-height: 18px; border-radius: 2px; }
+[data-strip="board"] .city-dayoff { font-size: 12px; color: var(--accent); letter-spacing: 0.04em; }
+[data-strip="board"] .city-remove { top: 50%; left: -1px; margin-top: -10px; }
+[data-strip="board"] .city-sub { display: none; }
+
+/* ===================================================== strip: poster ==== */
+[data-strip="poster"] .strip { gap: 0; align-items: flex-end; }
+[data-strip="poster"] .city {
+  flex: 0 0 auto;
+  padding: 4px 16px 10px;
+  border-left: 2px solid var(--fg);
+}
+[data-strip="poster"] .city:first-child { border-left: 0; }
+[data-strip="poster"] .poster-time {
+  font-family: var(--font-display);
+  font-size: 58px;
+  font-weight: 800;
+  line-height: 0.88;
+  letter-spacing: -0.045em;
+  color: var(--past); /* deep teal: the first ink */
+  mix-blend-mode: multiply;
+}
+[data-strip="poster"] .city[data-state="work"] .poster-time { color: var(--accent); }
+[data-strip="poster"] .city[data-state="early"] .poster-time { color: #d98b1f; }
+[data-strip="poster"] .poster-foot { margin-top: 8px; }
+[data-strip="poster"] .city-name { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; }
+[data-strip="poster"] .city-sub { font-size: 12.5px; font-weight: 400; color: var(--fg-mute); }
+[data-strip="poster"] .city-dayoff {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: 0.02em;
+}
+[data-strip="poster"] .strip[data-hour12="true"] .poster-time { font-size: 48px; }
+
+/* ------------------------------------------------------- narrow screens */
+@media (max-width: 760px) {
+  [data-strip="tiles"] .strip { flex-wrap: wrap; gap: 1px; width: 100%; overflow: visible; background: var(--line); }
+  [data-strip="tiles"] .city { flex: 1 1 calc(50% - 1px); width: auto; height: 156px; border-left: 0; }
+  [data-strip="tiles"] .tile-time { font-size: 42px; }
+
+  [data-strip="bands"] .band-row { grid-template-columns: 1fr 88px; grid-template-areas: "head tail" "mid mid"; gap: 6px 10px; }
+  [data-strip="bands"] .band-head { grid-area: head; }
+  [data-strip="bands"] .band-mid { grid-area: mid; }
+  [data-strip="bands"] .band-tail { grid-area: tail; }
+  [data-strip="bands"] .band-time { font-size: 26px; }
+
+  [data-strip="dials"] .strip { flex-wrap: wrap; justify-content: center; }
+  [data-strip="dials"] .city { flex: 0 0 33.33%; width: auto; }
+
+  [data-strip="board"] .board-row { grid-template-columns: 92px 1fr 70px; }
+  [data-strip="board"] .board-country, [data-strip="board"] .board-bar { display: none; }
+
+  [data-strip="poster"] .poster-time { font-size: 52px; }
+  [data-strip="poster"] .city { padding: 4px 14px 8px; }
+}

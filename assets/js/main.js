@@ -21,6 +21,8 @@ import { WorldMap } from './worldmap.js';
 import { PinLayer } from './pins.js';
 import { Timeline } from './timeline.js';
 import { downloadInvite } from './calendar.js';
+import { THEMES, applyTheme, getTheme, themeFontsReady } from './themes.js';
+import { buildStripItem } from './strip.js';
 
 // Update this after forking, or drop the link from index.html.
 const REPO_URL = 'https://github.com/ondrik/WebZoneClock';
@@ -50,6 +52,10 @@ const el = {
   searchHint: document.getElementById('search-hint'),
   searchClose: document.getElementById('search-close'),
   repoLink: document.getElementById('repo-link'),
+  themeBtn: document.getElementById('theme-btn'),
+  themeMenu: document.getElementById('theme-menu'),
+  themeName: document.getElementById('theme-name'),
+  themeSwatch: document.getElementById('theme-swatch'),
   toast: document.getElementById('toast'),
 };
 
@@ -57,6 +63,7 @@ const map = new WorldMap(el.map);
 const pins = new PinLayer(el.pins);
 
 let timeline = null;
+let theme = null;
 // Active map-drag gesture, or null. See bindMapDrag.
 let mapDrag = null;
 // Offset from real time, in ms, set by the timeline. Deliberately not
@@ -79,6 +86,7 @@ async function main() {
   }
 
   initState();
+  theme = applyTheme(state.theme);
   // A shared link can pin the view to the moment the sender picked.
   if (state.sharedAt) travelMs = state.sharedAt - Date.now();
   onChange(() => renderAll(true));
@@ -105,6 +113,7 @@ async function main() {
   bindStripInteractions();
   bindTimebar();
   bindMapDrag();
+  buildThemeMenu();
 
   const ro = new ResizeObserver(() => {
     map.resize();
@@ -118,7 +127,7 @@ async function main() {
   // One tick a second is cheap and keeps the minute flip prompt; the heavy
   // work is gated behind a render key that only changes when the minute does.
   setInterval(() => renderAll(false), 1000);
-  if (document.fonts?.ready) document.fonts.ready.then(() => renderAll(true));
+  themeFontsReady(theme).then(() => renderAll(true));
   window.addEventListener('pageshow', () => renderAll(true));
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden) renderAll(true);
@@ -158,7 +167,7 @@ function renderAll(force) {
   const entries = buildEntries(now);
   lastEntries = entries;
   renderStrip(entries);
-  map.draw(now, state.daylight);
+  map.draw(now, state.daylight, theme.map);
   syncPinInset(false);
   pins.render(entries, map);
 
@@ -208,92 +217,43 @@ function homeTimezone() {
 function renderStrip(entries) {
   el.strip.textContent = '';
   el.strip.dataset.hour12 = String(state.hour12);
-  el.stripEmpty.hidden = entries.length > 0;
 
+  // Colours for the sunlight bands, read from the theme's own tokens.
+  const css = getComputedStyle(document.documentElement);
+  const ctx = {
+    now: shownNow(),
+    bandColors: {
+      night: rgbTriplet(css.getPropertyValue('--band-night'), [20, 20, 24]),
+      day: rgbTriplet(css.getPropertyValue('--band-day'), [240, 220, 170]),
+    },
+  };
+
+  el.stripEmpty.hidden = entries.length > 0;
   for (const entry of entries) {
-    el.strip.appendChild(buildTile(entry));
+    el.strip.appendChild(buildStripItem(theme.strip, entry, ctx));
   }
 }
 
-function buildTile(entry) {
-  const tile = document.createElement('div');
-  tile.className = 'tile';
-  tile.dataset.state = entry.state;
-  tile.dataset.id = entry.city.id;
-  tile.setAttribute('role', 'listitem');
-  tile.draggable = true;
-  tile.title = entry.isHome
-    ? `${entry.city.label} — your home city. Click to unset.`
-    : `${entry.city.label}, ${entry.city.country}. Click to make this your home city.`;
-
-  const remove = document.createElement('button');
-  remove.className = 'tile-remove';
-  remove.type = 'button';
-  remove.setAttribute('aria-label', `Remove ${entry.city.label}`);
-  remove.innerHTML = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9"/></svg>';
-  tile.appendChild(remove);
-
-  const time = document.createElement('div');
-  time.className = 'tile-time';
-  const clock = document.createElement('span');
-  clock.className = 'tile-clock';
-  clock.append(document.createTextNode(entry.time));
-  if (entry.meridiem) {
-    const mer = document.createElement('span');
-    mer.className = 'meridiem';
-    mer.textContent = entry.meridiem;
-    clock.appendChild(mer);
-  }
-  time.appendChild(clock);
-  tile.appendChild(time);
-
-  if (entry.dayDelta !== 0) {
-    const off = document.createElement('div');
-    off.className = 'tile-dayoff';
-    off.textContent = entry.dayDelta > 0 ? 'tomorrow' : 'yesterday';
-    tile.appendChild(off);
-  }
-
-  const name = document.createElement('div');
-  name.className = 'tile-name';
-  if (entry.isHome) {
-    const arrow = document.createElement('span');
-    arrow.innerHTML =
-      '<svg viewBox="0 0 12 12" aria-hidden="true" style="fill:currentColor;stroke:none"><path d="M11 1L1 5.6l3.7 1.1L6 11z"/></svg>';
-    name.appendChild(arrow.firstChild);
-  }
-  name.append(document.createTextNode(entry.city.label));
-  tile.appendChild(name);
-
-  const sub = document.createElement('div');
-  sub.className = 'tile-sub';
-  const country = document.createElement('span');
-  country.className = 'sub-country';
-  country.textContent = entry.city.country;
-  const offset = document.createElement('span');
-  offset.className = 'sub-offset';
-  offset.textContent = entry.offsetLabel;
-  sub.append(country, offset);
-  tile.appendChild(sub);
-
-  return tile;
+function rgbTriplet(value, fallback) {
+  const nums = String(value).match(/\d+/g);
+  return nums && nums.length >= 3 ? nums.slice(0, 3).map(Number) : fallback;
 }
 
 function bindStripInteractions() {
   el.strip.addEventListener('click', (e) => {
-    const tile = e.target.closest('.tile');
-    if (!tile) return;
+    const city = e.target.closest('.city');
+    if (!city) return;
 
-    if (e.target.closest('.tile-remove')) {
-      removeCity(tile.dataset.id);
+    if (e.target.closest('.city-remove')) {
+      removeCity(city.dataset.id);
       return;
     }
-    setHome(tile.dataset.id);
+    setHome(city.dataset.id);
   });
 
   el.strip.addEventListener('mouseover', (e) => {
-    const tile = e.target.closest('.tile');
-    if (tile) pins.highlight(tile.dataset.id);
+    const city = e.target.closest('.city');
+    if (city) pins.highlight(city.dataset.id);
   });
   el.strip.addEventListener('mouseleave', () => pins.highlight(null));
 
@@ -301,10 +261,10 @@ function bindStripInteractions() {
   let draggingId = null;
 
   el.strip.addEventListener('dragstart', (e) => {
-    const tile = e.target.closest('.tile');
-    if (!tile) return;
-    draggingId = tile.dataset.id;
-    tile.classList.add('dragging');
+    const city = e.target.closest('.city');
+    if (!city) return;
+    draggingId = city.dataset.id;
+    city.classList.add('dragging');
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', draggingId);
   });
@@ -312,17 +272,17 @@ function bindStripInteractions() {
   el.strip.addEventListener('dragover', (e) => {
     if (!draggingId) return;
     e.preventDefault();
-    const tile = e.target.closest('.tile');
+    const city = e.target.closest('.city');
     for (const t of el.strip.children) t.classList?.remove('drop-target');
-    if (tile) tile.classList.add('drop-target');
+    if (city) city.classList.add('drop-target');
   });
 
   el.strip.addEventListener('drop', (e) => {
     if (!draggingId) return;
     e.preventDefault();
-    const tile = e.target.closest('.tile');
-    if (tile && tile.dataset.id !== draggingId) {
-      const target = [...el.strip.children].indexOf(tile);
+    const city = e.target.closest('.city');
+    if (city && city.dataset.id !== draggingId) {
+      const target = [...el.strip.children].indexOf(city);
       reorder(draggingId, target);
     }
     cleanupDrag();
@@ -489,6 +449,68 @@ function bindMapDrag() {
     if (e.target.closest('.timebar, .share-btn')) return;
     timeline.set(0);
   });
+}
+
+/** The look picker: a swatch per theme, applied instantly. */
+function buildThemeMenu() {
+  for (const t of THEMES) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.setAttribute('role', 'menuitemradio');
+    b.dataset.theme = t.id;
+
+    const sw = document.createElement('span');
+    sw.className = 'swatch';
+    sw.innerHTML = t.swatch.map((c) => `<i style="background:${c}"></i>`).join('');
+
+    const label = document.createElement('span');
+    label.innerHTML = `<span class="picker-name">${t.name}</span><span class="picker-blurb">${t.blurb}</span>`;
+
+    b.append(sw, label);
+    el.themeMenu.appendChild(b);
+  }
+
+  el.themeBtn.addEventListener('click', () => toggleThemeMenu(el.themeMenu.hidden));
+
+  el.themeMenu.addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-theme]');
+    if (!b) return;
+    setTheme(b.dataset.theme);
+    toggleThemeMenu(false);
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!el.themeMenu.hidden && !e.target.closest('.picker')) toggleThemeMenu(false);
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !el.themeMenu.hidden) toggleThemeMenu(false);
+  });
+
+  syncThemeUi();
+}
+
+function toggleThemeMenu(open) {
+  el.themeMenu.hidden = !open;
+  el.themeBtn.setAttribute('aria-expanded', String(open));
+}
+
+function setTheme(id) {
+  theme = applyTheme(id);
+  update({ theme: theme.id });
+  syncThemeUi();
+  // The strip layout and map style both changed; redraw everything.
+  renderAll(true);
+  // Webfont metrics decide label widths, so place them again once they land.
+  themeFontsReady(theme).then(() => renderAll(true));
+}
+
+function syncThemeUi() {
+  const active = getTheme(state.theme);
+  el.themeName.textContent = active.name;
+  el.themeSwatch.innerHTML = active.swatch.map((c) => `<i style="background:${c}"></i>`).join('');
+  for (const b of el.themeMenu.querySelectorAll('button[data-theme]')) {
+    b.setAttribute('aria-checked', String(b.dataset.theme === active.id));
+  }
 }
 
 function syncSegmented() {

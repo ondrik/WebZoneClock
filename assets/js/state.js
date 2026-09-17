@@ -5,6 +5,7 @@
  */
 
 import { getCity, cityForTimezone } from './citydb.js';
+import { DEFAULT_THEME, getTheme } from './themes.js';
 
 const STORAGE_KEY = 'webzoneclock.v1';
 
@@ -22,6 +23,7 @@ export const state = {
   homeId: null,
   hour12: false,
   daylight: true,
+  theme: DEFAULT_THEME,
   // Set when a shared link carried a specific moment; consumed once by main.
   sharedAt: null,
 };
@@ -89,6 +91,7 @@ export function init() {
   state.ids = ids;
   state.hour12 = Boolean(stored?.hour12);
   state.daylight = stored?.daylight !== false;
+  state.theme = getTheme(stored?.theme).id;
   // Only a link carries a moment; a value in storage would be stale.
   state.sharedAt = fromHash ? (fromHash.sharedAt ?? null) : null;
   state.homeId =
@@ -114,6 +117,7 @@ function save() {
         homeId: state.homeId,
         hour12: state.hour12,
         daylight: state.daylight,
+        theme: state.theme,
       }),
     );
   } catch {
@@ -140,6 +144,7 @@ export function shareFragment(shownAt = null, travelMs = 0) {
   if (state.homeId) parts.push(`h=${encodeURIComponent(state.homeId)}`);
   if (state.hour12) parts.push('f=12');
   if (!state.daylight) parts.push('d=0');
+  if (state.theme !== DEFAULT_THEME) parts.push(`k=${encodeURIComponent(state.theme)}`);
   if (shownAt && travelMs !== 0) parts.push(`t=${Math.round(shownAt.getTime() / 1000)}`);
   return `#${parts.join('&')}`;
 }
@@ -162,6 +167,7 @@ function readHash() {
     homeId: params.get('h') || null,
     hour12: params.get('f') === '12',
     daylight: params.get('d') !== '0',
+    theme: params.get('k') || null,
     sharedAt: Number.isFinite(t) && t > 0 ? t * 1000 : null,
   };
 }
