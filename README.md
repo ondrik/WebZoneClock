@@ -204,8 +204,16 @@ dependency would be a change of direction rather than a detail.
 
 ## Attribution
 
-Please check these terms yourself before publishing — they are the upstream
-sources, summarised in good faith and not legal advice.
+The interface is modelled on **World Clock Pro**, a desktop world clock. The
+strip of city clocks, the colouring of each by what its people are likely
+doing, the day/night map and the scrubbable timeline all follow its design.
+It was reimplemented from observation; none of its code was used. WebZoneClock
+is an independent project, not affiliated with or endorsed by World Clock Pro
+or its publisher.
+
+The data and typefaces come with terms of their own. Please check them yourself
+before publishing — they are summarised here in good faith and are not legal
+advice.
 
 - **Coastlines**: [world-atlas](https://github.com/topojson/world-atlas),
   derived from [Natural Earth](https://www.naturalearthdata.com/), which is in
