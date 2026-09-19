@@ -194,7 +194,11 @@ svg {
 .city { position: relative; cursor: grab; }
 .city:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; z-index: 1; }
 .city:focus:not(:focus-visible) { outline: none; }
-.name-arrow[hidden], .city-dayoff[hidden], .band-sun[hidden] { display: none; }
+.name-arrow[hidden], .band-sun[hidden] { display: none; }
+
+/* The day caption always occupies its line so the strip cannot change height
+   when a city crosses midnight; only its ink comes and goes. */
+.city-dayoff.is-empty { visibility: hidden; }
 
 .visually-hidden {
   position: absolute;

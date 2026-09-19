@@ -3,12 +3,17 @@
  *
  * The strategy is chosen per kind of request rather than applied uniformly:
  *
- *   - the page itself is fetched from the network first, so a deploy is picked
- *     up on the next load instead of being pinned to whatever was cached;
- *   - everything else is served from the cache immediately and refreshed in
- *     the background, which keeps startup fast without going stale for long;
- *   - fonts are cached separately so a theme switch works offline once its
- *     faces have been seen.
+ *   - anything from this origin is fetched from the network first and only
+ *     falls back to the cache when there is no network;
+ *   - fonts are served from the cache and refreshed behind it, since their
+ *     URLs already encode their contents and can never go stale.
+ *
+ * Network-first for our own files is deliberate. The app is a set of ES
+ * modules that import each other, so serving a fresh index.html beside a
+ * stale module -- which is what a cache-first policy does for one load after
+ * every deploy -- can pair code with an interface it no longer has. Offline
+ * capability is the point of this worker; shaving milliseconds off an online
+ * load is not worth that risk, and the HTTP cache already does that job.
  *
  * Bump VERSION when shipping a change that must not be served from an old
  * cache. Older caches are deleted on activation.
@@ -74,11 +79,9 @@ self.addEventListener('fetch', (event) => {
   const isFont = /fonts\.(googleapis|gstatic)\.com$/.test(url.hostname);
   if (!sameOrigin && !isFont) return;
 
-  if (request.mode === 'navigate') {
-    event.respondWith(networkFirst(request));
-    return;
-  }
-  event.respondWith(staleWhileRevalidate(request, isFont ? RUNTIME : SHELL));
+  event.respondWith(
+    isFont ? staleWhileRevalidate(request, RUNTIME) : networkFirst(request),
+  );
 });
 
 /** Prefer fresh; fall back to whatever was cached, then to the shell. */
@@ -89,7 +92,14 @@ async function networkFirst(request) {
     if (response.ok) cache.put(request, response.clone());
     return response;
   } catch {
-    return (await cache.match(request)) || (await cache.match('index.html')) || Response.error();
+    const cached = await cache.match(request);
+    if (cached) return cached;
+    // A deep link with no network still deserves the app rather than an error.
+    if (request.mode === 'navigate') {
+      const shell = await cache.match('index.html');
+      if (shell) return shell;
+    }
+    return Response.error();
   }
 }
 

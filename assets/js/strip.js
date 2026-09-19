@@ -174,14 +174,26 @@ function citySub() {
   };
 }
 
+/**
+ * "Tomorrow" / "Yesterday", shown when a city is not on the same date as home.
+ *
+ * The line is always in the layout, even when there is nothing to say. A city
+ * crosses midnight while you watch, and if the caption appeared and vanished
+ * the strip would change height, resize the map underneath it and force a
+ * full redraw — a visible jolt, once a minute, for no reason.
+ */
 function dayCaption() {
   const node = document.createElement('div');
   node.className = 'city-dayoff';
+
   return {
     node,
     set(e) {
-      node.hidden = e.dayDelta === 0;
-      if (e.dayDelta) node.textContent = e.dayDelta > 0 ? 'Tomorrow' : 'Yesterday';
+      const empty = e.dayDelta === 0;
+      // A non-breaking space keeps the line box; visibility keeps the space.
+      node.textContent = empty ? '\u00a0' : e.dayDelta > 0 ? 'Tomorrow' : 'Yesterday';
+      node.classList.toggle('is-empty', empty);
+      node.setAttribute('aria-hidden', String(empty));
     },
   };
 }

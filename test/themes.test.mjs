@@ -107,6 +107,30 @@ test('the registry and the stylesheet agree', () => {
   }
 });
 
+/**
+ * The day caption comes and goes as cities cross midnight. If it were removed
+ * from the layout the strip would change height, resize the map beneath it and
+ * force a redraw — a visible jolt once a minute. It must reserve its line.
+ */
+test('the day caption is hidden without being removed from the layout', async () => {
+  const app = await readFile(new URL('../assets/css/app.css', import.meta.url), 'utf8');
+  const strip = await readFile(new URL('../assets/js/strip.js', import.meta.url), 'utf8');
+  const all = `${app}\n${css}`;
+
+  assert.match(all, /\.city-dayoff\.is-empty\s*\{[^}]*visibility:\s*hidden/,
+    'the empty caption must be hidden with visibility, not removed');
+
+  for (const rule of all.matchAll(/([^{}]*\.city-dayoff[^{}]*)\{([^}]*)\}/g)) {
+    assert.doesNotMatch(rule[2], /display:\s*none/,
+      `"${rule[1].trim()}" takes the caption out of the layout`);
+  }
+
+  // And the element must always carry text, or the line box collapses anyway.
+  assert.doesNotMatch(strip, /node\.hidden\s*=\s*e\.dayDelta/,
+    'the caption is being toggled with the hidden attribute again');
+  assert.match(strip, /\\u00a0/, 'the caption no longer keeps a placeholder character');
+});
+
 test('an unknown theme falls back to the default', () => {
   assert.equal(getTheme('nope').id, DEFAULT_THEME);
   assert.equal(getTheme(undefined).id, DEFAULT_THEME);
