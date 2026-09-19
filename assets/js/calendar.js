@@ -1,8 +1,8 @@
 /**
- * "Add to calendar": the web stand-in for the original's native calendar
- * integration. Produces an .ics file for the moment currently selected on the
+ * "Add to calendar": an .ics file for the moment currently selected on the
  * timeline, with every city's local time written into the event so the people
- * you send it to can see the spread at a glance.
+ * you send it to can see the spread at a glance. A downloaded file rather than
+ * a calendar integration, since the app has no account to connect to.
  */
 
 const DURATION_MIN = 30;

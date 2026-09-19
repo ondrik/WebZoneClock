@@ -78,15 +78,16 @@ export function dayDelta(parts, refParts) {
   return Math.round((a - b) / 86400000);
 }
 
-/** The default working day, matching the app this was modelled on. */
+/** The default working day. */
 export const DEFAULT_HOURS = { dayStart: 6, workStart: 9, workEnd: 18 };
 
 /**
  * Which of the three states a local hour falls into.
  *
- * The defaults were read off the original app by scrubbing its timeline: 17:59
- * is still working hours and 18:00 is not, 08:59 is "awake" and 09:00 is not.
- * Evening belongs with the night. On a weekend nobody is at work, so the
+ * The bands are half-open, so 17:59 is still working hours and 18:00 is not,
+ * and 08:59 is "awake" while 09:00 is not. Evening belongs with the night
+ * rather than with the early morning: someone at 20:00 is awake but no more
+ * reachable than someone asleep. On a weekend nobody is at work, so the
  * working band collapses into "awake".
  */
 export function dayState(hour, hours = DEFAULT_HOURS, isWeekend = false) {

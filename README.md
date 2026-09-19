@@ -1,8 +1,10 @@
 # WebZoneClock
 
-A world clock for the browser, modelled on the desktop app **World Clock Pro**:
-a strip of city tiles that colour themselves by what people there are probably
-doing, over a world map with a live day/night terminator.
+A world clock for the browser: a strip of cities that colour themselves by
+what the people there are probably doing, over a world map with a live
+day/night terminator. Built for anyone whose colleagues, collaborators or
+family are spread across several timezones and who would rather not do the
+arithmetic every time.
 
 Static HTML, CSS and ES modules. No build step, no framework, no runtime
 dependencies — it is meant to be served straight off GitHub Pages.
@@ -212,11 +214,8 @@ sources, summarised in good faith and not legal advice.
   [city-timezones](https://github.com/kevinroberts/city-timezones) (MIT),
   whose data derives from SimpleMaps' World Cities Basic database, released
   under CC BY 4.0 — attribution required.
-- **Typeface**: [Inter](https://rsms.me/inter/), SIL Open Font License, loaded
-  from Google Fonts.
-
-WebZoneClock is an independent reimplementation. It is not affiliated with,
-endorsed by, or derived from the code of World Clock Pro or its publisher.
+- **Typefaces**: Inter, Fraunces, Spectral, Barlow Condensed and Bricolage
+  Grotesque, all under the SIL Open Font License and loaded from Google Fonts.
 
 ## Known limitations
 
@@ -226,11 +225,10 @@ endorsed by, or derived from the code of World Clock Pro or its publisher.
 - The population cut-off is 150,000, with capitals and timezone-distinctive
   places added by hand. A smaller town will not be in the list; add it to
   `MANUAL` in `tools/build_cities.py`.
-- Working hours are hardcoded to 09:00–18:00 local for every city, and are not
-  weekend-aware. The three colour bands were read off the original app by
-  scrubbing its timeline and checking where each tile changed.
+- The default working hours apply to every city alike; there is no per-city
+  schedule, so one person's night shift colours everybody's day.
 - The timeline spans one day either side of now, and map dragging is clamped
-  to the same range. The original slides its ruler indefinitely; this one has
-  fixed ends, which keeps dragging predictable at the cost of a longer reach.
+  to the same range. Fixed ends keep dragging predictable, at the cost of
+  reach.
 - Calendar events are a fixed 30 minutes, and are downloaded as a file rather
   than written into a calendar account.

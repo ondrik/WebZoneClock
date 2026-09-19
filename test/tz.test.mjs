@@ -6,10 +6,10 @@ import {
 } from '../assets/js/tz.js';
 
 /**
- * These boundaries were read off the original app by scrubbing its timeline:
- * 17:59 is still working hours and 18:00 is not; 08:59 is awake and 09:00 is
- * not. Evening belongs with the night. Guarding them here because they are a
- * behavioural contract that nothing else in the code states.
+ * The bands are half-open: 17:59 is still working hours and 18:00 is not;
+ * 08:59 is awake and 09:00 is not. Evening belongs with the night. Guarding
+ * the edges here because they are a behavioural contract that nothing else in
+ * the code states, and an off-by-one would be easy to miss by eye.
  */
 test('day-state boundaries match the observed contract', () => {
   const expected = {
