@@ -2,241 +2,414 @@
  * The city strip, in five layouts.
  *
  * Every builder receives the same entry — city, local parts, formatted time,
- * day state, whether it is home — and returns one element. What differs is the
- * form the information takes: a filled tile, a band of the city's real
- * sunlight, a brass dial, a board row, or a printed number.
+ * day state, whether it is home — and returns a node plus an `update`. What
+ * differs is the form the information takes: a filled tile, a band of the
+ * city's real sunlight, a brass dial, a board row, or a printed number.
+ *
+ * Nodes are reused and updated in place rather than rebuilt. Scrubbing the
+ * timeline re-renders every frame, and rebuilding would both churn the DOM and
+ * throw away keyboard focus on whichever city you were operating.
  */
 
 import { daylightProfile, dayFraction, sunEvents, gradientStops, mixRgb } from './daylight.js';
 
 const HOME_ARROW =
   '<svg viewBox="0 0 12 12" aria-hidden="true" class="arrow"><path d="M11 1L1 5.6l3.7 1.1L6 11z"/></svg>';
-
 const REMOVE_ICON =
   '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9"/></svg>';
 
-export function buildStripItem(mode, entry, ctx) {
-  const build = BUILDERS[mode] || BUILDERS.tiles;
-  const node = build(entry, ctx);
-
-  node.dataset.id = entry.city.id;
-  node.dataset.state = entry.state;
-  node.classList.add('city');
-  if (entry.isHome) node.classList.add('is-home');
-  node.setAttribute('role', 'listitem');
-  node.draggable = true;
-  node.title = entry.isHome
-    ? `${entry.city.label} — your home city. Click to unset.`
-    : `${entry.city.label}, ${entry.city.country}. Click to make this your home city.`;
-
-  node.appendChild(removeButton(entry));
-  return node;
-}
-
-/* --------------------------------------------------------------- shared */
-
-function removeButton(entry) {
-  const b = document.createElement('button');
-  b.className = 'city-remove';
-  b.type = 'button';
-  b.setAttribute('aria-label', `Remove ${entry.city.label}`);
-  b.innerHTML = REMOVE_ICON;
-  return b;
-}
-
-function clockText(entry) {
-  const span = document.createElement('span');
-  span.className = 'clock';
-  span.append(document.createTextNode(entry.time));
-  if (entry.meridiem) {
-    const m = document.createElement('span');
-    m.className = 'meridiem';
-    m.textContent = entry.meridiem;
-    span.appendChild(m);
+/** Keyed collection of city items; the strip's only entry point. */
+export class StripView {
+  constructor(el) {
+    this.el = el;
+    this.items = new Map();
+    this.mode = null;
   }
-  return span;
-}
 
-function nameNode(entry, className = 'city-name') {
-  const el = document.createElement('div');
-  el.className = className;
-  if (entry.isHome) el.insertAdjacentHTML('beforeend', HOME_ARROW);
-  el.append(document.createTextNode(entry.city.label));
-  return el;
-}
+  render(mode, entries, ctx) {
+    // A different layout means different nodes; nothing can be reused.
+    if (mode !== this.mode) {
+      this.el.textContent = '';
+      this.items.clear();
+      this.mode = mode;
+    }
 
-function subNode(entry) {
-  const sub = document.createElement('div');
-  sub.className = 'city-sub';
-  const country = document.createElement('span');
-  country.className = 'sub-country';
-  country.textContent = entry.city.country;
-  const offset = document.createElement('span');
-  offset.className = 'sub-offset';
-  offset.textContent = entry.offsetLabel;
-  sub.append(country, offset);
-  return sub;
-}
+    const seen = new Set();
+    for (const entry of entries) {
+      seen.add(entry.city.id);
+      let item = this.items.get(entry.city.id);
+      if (!item) {
+        item = createItem(mode, entry, ctx);
+        this.items.set(entry.city.id, item);
+      }
+      item.update(entry, ctx);
+    }
 
-function dayCaption(entry) {
-  if (!entry.dayDelta) return null;
-  const d = document.createElement('div');
-  d.className = 'city-dayoff';
-  d.textContent = entry.dayDelta > 0 ? 'Tomorrow' : 'Yesterday';
-  return d;
-}
+    for (const [id, item] of this.items) {
+      if (!seen.has(id)) {
+        item.root.remove();
+        this.items.delete(id);
+      }
+    }
 
-/**
- * The sunlight band: a gradient built from the city's own solar elevation,
- * with a marker at the moment being shown.
- */
-function sunBand(entry, ctx, { withTicks = false } = {}) {
-  const wrap = document.createElement('div');
-  wrap.className = 'band';
-
-  const profile = daylightProfile(entry.city, ctx.now);
-  const { night, day } = ctx.bandColors;
-  wrap.style.background = `linear-gradient(to right, ${gradientStops(profile, (l) =>
-    mixRgb(night, day, l),
-  )})`;
-
-  const events = sunEvents(profile);
-  if (events.polarDay) wrap.dataset.polar = 'day';
-  else if (events.polarNight) wrap.dataset.polar = 'night';
-
-  if (withTicks) {
-    for (const [frac, kind] of [
-      [events.sunrise, 'rise'],
-      [events.sunset, 'set'],
-    ]) {
-      if (frac === null || frac === undefined) continue;
-      const tick = document.createElement('span');
-      tick.className = `band-sun band-sun-${kind}`;
-      tick.style.left = `${frac * 100}%`;
-      wrap.appendChild(tick);
+    // Put the nodes in the order the entries ask for, moving only what moved.
+    let prev = null;
+    for (const entry of entries) {
+      const node = this.items.get(entry.city.id).root;
+      const want = prev ? prev.nextSibling : this.el.firstChild;
+      if (node !== want) this.el.insertBefore(node, want);
+      prev = node;
     }
   }
 
+  /** The element for a city, so callers can focus or scroll to it. */
+  nodeFor(id) {
+    return this.items.get(id)?.root ?? null;
+  }
+
+  ids() {
+    return [...this.items.keys()];
+  }
+}
+
+function createItem(mode, entry, ctx) {
+  const build = BUILDERS[mode] || BUILDERS.tiles;
+  const built = build(entry, ctx);
+  const { root } = built;
+
+  root.classList.add('city');
+  root.dataset.id = entry.city.id;
+  root.setAttribute('role', 'listitem');
+  root.tabIndex = 0;
+  root.draggable = true;
+
+  const remove = document.createElement('button');
+  remove.className = 'city-remove';
+  remove.type = 'button';
+  remove.tabIndex = -1; // reachable through the city's own keyboard shortcuts
+  remove.innerHTML = REMOVE_ICON;
+  root.appendChild(remove);
+
+  const update = (e, c) => {
+    root.dataset.state = e.state;
+    root.dataset.offsetBreak = String(Boolean(e.offsetBreak));
+    root.classList.toggle('is-home', e.isHome);
+    remove.setAttribute('aria-label', `Remove ${e.city.label}`);
+    root.setAttribute('aria-label', describe(e));
+    root.title = describe(e);
+    built.update(e, c);
+  };
+
+  update(entry, ctx);
+  return { root, update };
+}
+
+function describe(e) {
+  const when = e.dayDelta > 0 ? ', tomorrow' : e.dayDelta < 0 ? ', yesterday' : '';
+  const home = e.isHome ? '. Your home city' : '';
+  const time = e.meridiem ? `${e.time} ${e.meridiem}` : e.time;
+  return `${e.city.label}, ${e.city.country}. ${time}${when} (${e.offsetLabel})${home}.`;
+}
+
+/* --------------------------------------------------------------- pieces */
+
+/** The clock face, including the am/pm marker when it is wanted. */
+function clock() {
+  const node = document.createElement('span');
+  node.className = 'clock';
+  const digits = document.createTextNode('');
+  node.appendChild(digits);
+  let marker = null;
+
+  return {
+    node,
+    set(e) {
+      digits.nodeValue = e.time;
+      if (e.meridiem && !marker) {
+        marker = document.createElement('span');
+        marker.className = 'meridiem';
+        node.appendChild(marker);
+      } else if (!e.meridiem && marker) {
+        marker.remove();
+        marker = null;
+      }
+      if (marker) marker.textContent = e.meridiem;
+    },
+  };
+}
+
+function cityName(className = 'city-name') {
+  const node = document.createElement('div');
+  node.className = className;
+  const arrow = document.createElement('span');
+  arrow.className = 'name-arrow';
+  arrow.innerHTML = HOME_ARROW;
+  const text = document.createTextNode('');
+  node.append(arrow, text);
+
+  return {
+    node,
+    set(e) {
+      arrow.hidden = !e.isHome;
+      text.nodeValue = e.city.label;
+    },
+  };
+}
+
+function citySub() {
+  const node = document.createElement('div');
+  node.className = 'city-sub';
+  const country = document.createElement('span');
+  country.className = 'sub-country';
+  const offset = document.createElement('span');
+  offset.className = 'sub-offset';
+  node.append(country, offset);
+
+  return {
+    node,
+    set(e) {
+      country.textContent = e.city.country;
+      offset.textContent = e.offsetLabel;
+    },
+  };
+}
+
+function dayCaption() {
+  const node = document.createElement('div');
+  node.className = 'city-dayoff';
+  return {
+    node,
+    set(e) {
+      node.hidden = e.dayDelta === 0;
+      if (e.dayDelta) node.textContent = e.dayDelta > 0 ? 'Tomorrow' : 'Yesterday';
+    },
+  };
+}
+
+/**
+ * A band of the city's own sunlight, with a marker at the moment being shown.
+ * The gradient only changes when the local date does, so it is rebuilt on that
+ * boundary rather than on every frame.
+ */
+function sunBand({ withTicks = false } = {}) {
+  const node = document.createElement('div');
+  node.className = 'band';
   const marker = document.createElement('span');
   marker.className = 'band-now';
-  marker.style.left = `${dayFraction(ctx.now, entry.city.tz) * 100}%`;
-  wrap.appendChild(marker);
+  const rise = document.createElement('span');
+  rise.className = 'band-sun band-sun-rise';
+  const set = document.createElement('span');
+  set.className = 'band-sun band-sun-set';
+  if (withTicks) node.append(rise, set);
+  node.appendChild(marker);
 
-  return wrap;
+  let key = null;
+
+  return {
+    node,
+    set(e, ctx) {
+      const stamp = `${e.parts.year}-${e.parts.month}-${e.parts.day}|${ctx.bandKey}`;
+      if (stamp !== key) {
+        key = stamp;
+        const profile = daylightProfile(e.city, ctx.now);
+        const { night, day } = ctx.bandColors;
+        node.style.background = `linear-gradient(to right, ${gradientStops(profile, (l) =>
+          mixRgb(night, day, l),
+        )})`;
+
+        const events = sunEvents(profile);
+        node.dataset.polar = events.polarDay ? 'day' : events.polarNight ? 'night' : '';
+        if (withTicks) {
+          place(rise, events.sunrise);
+          place(set, events.sunset);
+        }
+      }
+      marker.style.left = `${dayFraction(ctx.now, e.city.tz) * 100}%`;
+    },
+  };
+}
+
+function place(el, frac) {
+  el.hidden = frac === null || frac === undefined;
+  if (!el.hidden) el.style.left = `${frac * 100}%`;
 }
 
 /* ------------------------------------------------------------- builders */
 
 const BUILDERS = {
-  /** The original: a solid block of colour per city. */
-  tiles(entry) {
-    const t = document.createElement('div');
-    t.className = 'tile';
-    const caption = dayCaption(entry);
-    if (caption) t.appendChild(caption);
-
+  /** A solid block of colour per city. */
+  tiles() {
+    const root = document.createElement('div');
+    root.className = 'tile';
+    const cap = dayCaption();
+    const c = clock();
     const time = document.createElement('div');
     time.className = 'tile-time';
-    time.appendChild(clockText(entry));
-    t.append(time, nameNode(entry, 'city-name tile-name'), subNode(entry));
-    return t;
+    time.appendChild(c.node);
+    const name = cityName('city-name tile-name');
+    const sub = citySub();
+    root.append(cap.node, time, name.node, sub.node);
+
+    return {
+      root,
+      update(e) {
+        cap.set(e);
+        c.set(e);
+        name.set(e);
+        sub.set(e);
+      },
+    };
   },
 
   /** A row per city: the whole local day as light, with now marked on it. */
-  bands(entry, ctx) {
-    const row = document.createElement('div');
-    row.className = 'band-row';
+  bands() {
+    const root = document.createElement('div');
+    root.className = 'band-row';
 
     const head = document.createElement('div');
     head.className = 'band-head';
-    head.append(nameNode(entry), subNode(entry));
+    const name = cityName();
+    const sub = citySub();
+    head.append(name.node, sub.node);
 
     const mid = document.createElement('div');
     mid.className = 'band-mid';
-    mid.appendChild(sunBand(entry, ctx, { withTicks: true }));
+    const band = sunBand({ withTicks: true });
+    mid.appendChild(band.node);
 
     const tail = document.createElement('div');
     tail.className = 'band-tail';
+    const c = clock();
     const time = document.createElement('div');
     time.className = 'band-time';
-    time.appendChild(clockText(entry));
-    tail.appendChild(time);
-    const caption = dayCaption(entry);
-    if (caption) tail.appendChild(caption);
+    time.appendChild(c.node);
+    const cap = dayCaption();
+    tail.append(time, cap.node);
 
-    row.append(head, mid, tail);
-    return row;
+    root.append(head, mid, tail);
+
+    return {
+      root,
+      update(e, ctx) {
+        name.set(e);
+        sub.set(e);
+        band.set(e, ctx);
+        c.set(e);
+        cap.set(e);
+      },
+    };
   },
 
   /** A dial per city, the sun's position read off a 24-hour face. */
-  dials(entry, ctx) {
-    const card = document.createElement('div');
-    card.className = 'dial-card';
+  dials() {
+    const root = document.createElement('div');
+    root.className = 'dial-card';
+    root.insertAdjacentHTML('beforeend', dialShell());
 
-    const profile = daylightProfile(entry.city, ctx.now, 96);
-    const events = sunEvents(profile);
-    const frac = dayFraction(ctx.now, entry.city.tz);
+    const svg = root.querySelector('.dial');
+    const arc = svg.querySelector('.dial-day');
+    const full = svg.querySelector('.dial-day-full');
+    const hand = svg.querySelector('.dial-hand');
 
-    card.insertAdjacentHTML('beforeend', dialSvg(events, frac));
-
+    const c = clock();
     const time = document.createElement('div');
     time.className = 'dial-time';
-    time.appendChild(clockText(entry));
-    card.append(time, nameNode(entry), subNode(entry));
+    time.appendChild(c.node);
+    const name = cityName();
+    const sub = citySub();
+    const cap = dayCaption();
+    root.append(time, name.node, sub.node, cap.node);
 
-    const caption = dayCaption(entry);
-    if (caption) card.appendChild(caption);
-    return card;
+    return {
+      root,
+      update(e, ctx) {
+        const profile = daylightProfile(e.city, ctx.now, 96);
+        const events = sunEvents(profile);
+
+        full.style.display = events.polarDay ? '' : 'none';
+        const drawArc = !events.polarDay && !events.polarNight
+          && events.sunrise !== null && events.sunset !== null;
+        arc.style.display = drawArc ? '' : 'none';
+        if (drawArc) arc.setAttribute('d', arcPath(events.sunrise, events.sunset));
+
+        const [hx, hy] = onCircle(dayFraction(ctx.now, e.city.tz), R - 7);
+        hand.setAttribute('x2', hx);
+        hand.setAttribute('y2', hy);
+
+        c.set(e);
+        name.set(e);
+        sub.set(e);
+        cap.set(e);
+      },
+    };
   },
 
   /** A board row, split-flap cells across it. */
-  board(entry, ctx) {
-    const row = document.createElement('div');
-    row.className = 'board-row';
+  board() {
+    const root = document.createElement('div');
+    root.className = 'board-row';
 
+    const c = clock();
     const time = document.createElement('div');
     time.className = 'board-cell board-time';
-    time.appendChild(clockText(entry));
+    time.appendChild(c.node);
 
-    const name = document.createElement('div');
-    name.className = 'board-cell board-name';
-    name.appendChild(nameNode(entry));
-    const caption = dayCaption(entry);
-    if (caption) name.appendChild(caption);
-
-    const zone = document.createElement('div');
-    zone.className = 'board-cell board-zone';
-    zone.textContent = entry.offsetLabel;
+    const nameCell = document.createElement('div');
+    nameCell.className = 'board-cell board-name';
+    const name = cityName();
+    const cap = dayCaption();
+    nameCell.append(name.node, cap.node);
 
     const country = document.createElement('div');
     country.className = 'board-cell board-country';
-    country.textContent = entry.city.country;
+    const zone = document.createElement('div');
+    zone.className = 'board-cell board-zone';
 
-    const bar = document.createElement('div');
-    bar.className = 'board-cell board-bar';
-    bar.appendChild(sunBand(entry, ctx));
+    const barCell = document.createElement('div');
+    barCell.className = 'board-cell board-bar';
+    const band = sunBand();
+    barCell.appendChild(band.node);
 
-    row.append(time, name, country, zone, bar);
-    return row;
+    root.append(time, nameCell, country, zone, barCell);
+
+    return {
+      root,
+      update(e, ctx) {
+        c.set(e);
+        name.set(e);
+        cap.set(e);
+        country.textContent = e.city.country;
+        zone.textContent = e.offsetLabel;
+        band.set(e, ctx);
+      },
+    };
   },
 
   /** Oversized printed numerals, one ink per state. */
-  poster(entry) {
-    const block = document.createElement('div');
-    block.className = 'poster-block';
-
+  poster() {
+    const root = document.createElement('div');
+    root.className = 'poster-block';
+    const cap = dayCaption();
+    const c = clock();
     const time = document.createElement('div');
     time.className = 'poster-time';
-    time.appendChild(clockText(entry));
-
+    time.appendChild(c.node);
     const foot = document.createElement('div');
     foot.className = 'poster-foot';
-    foot.append(nameNode(entry), subNode(entry));
+    const name = cityName();
+    const sub = citySub();
+    foot.append(name.node, sub.node);
+    root.append(cap.node, time, foot);
 
-    const caption = dayCaption(entry);
-    if (caption) block.appendChild(caption);
-    block.append(time, foot);
-    return block;
+    return {
+      root,
+      update(e) {
+        cap.set(e);
+        c.set(e);
+        name.set(e);
+        sub.set(e);
+      },
+    };
   },
 };
 
@@ -246,34 +419,25 @@ const R = 34;
 const CX = 40;
 const CY = 40;
 
-/**
- * A 24-hour face: midnight at the bottom, noon at the top, the lit part of
- * the day drawn as an arc and the current time as a hand.
- */
-function dialSvg(events, frac) {
-  const parts = [
-    `<svg class="dial" viewBox="0 0 80 80" aria-hidden="true">`,
-    `<circle class="dial-rim" cx="${CX}" cy="${CY}" r="${R}"/>`,
-  ];
+function dialShell() {
+  const ticks = [0, 0.25, 0.5, 0.75]
+    .map((q) => {
+      const [x1, y1] = onCircle(q, R - 4);
+      const [x2, y2] = onCircle(q, R);
+      return `<line class="dial-tick" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`;
+    })
+    .join('');
 
-  if (events.polarDay) {
-    parts.push(`<circle class="dial-day-full" cx="${CX}" cy="${CY}" r="${R}"/>`);
-  } else if (!events.polarNight && events.sunrise !== null && events.sunset !== null) {
-    parts.push(`<path class="dial-day" d="${arcPath(events.sunrise, events.sunset)}"/>`);
-  }
-
-  // Hour ticks at the quarters.
-  for (const q of [0, 0.25, 0.5, 0.75]) {
-    const [x1, y1] = onCircle(q, R - 4);
-    const [x2, y2] = onCircle(q, R);
-    parts.push(`<line class="dial-tick" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`);
-  }
-
-  const [hx, hy] = onCircle(frac, R - 7);
-  parts.push(`<line class="dial-hand" x1="${CX}" y1="${CY}" x2="${hx}" y2="${hy}"/>`);
-  parts.push(`<circle class="dial-hub" cx="${CX}" cy="${CY}" r="2.2"/>`);
-  parts.push('</svg>');
-  return parts.join('');
+  return (
+    `<svg class="dial" viewBox="0 0 80 80" aria-hidden="true">` +
+    `<circle class="dial-rim" cx="${CX}" cy="${CY}" r="${R}"/>` +
+    `<circle class="dial-day-full" cx="${CX}" cy="${CY}" r="${R}" style="display:none"/>` +
+    `<path class="dial-day" d="" style="display:none"/>` +
+    ticks +
+    `<line class="dial-hand" x1="${CX}" y1="${CY}" x2="${CX}" y2="${CY}"/>` +
+    `<circle class="dial-hub" cx="${CX}" cy="${CY}" r="2.2"/>` +
+    `</svg>`
+  );
 }
 
 /**

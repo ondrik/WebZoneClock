@@ -16,13 +16,16 @@ import {
   reorder,
   shareFragment,
 } from './state.js';
-import { zonedParts, formatTime, offsetLabel, dayDelta, dayState } from './tz.js';
+import {
+  zonedParts, formatTime, offsetLabel, offsetMinutes, dayDelta, dayState, isWeekend,
+  normalizeHours,
+} from './tz.js';
 import { WorldMap } from './worldmap.js';
 import { PinLayer } from './pins.js';
 import { Timeline } from './timeline.js';
 import { downloadInvite } from './calendar.js';
 import { THEMES, applyTheme, getTheme, themeFontsReady } from './themes.js';
-import { buildStripItem } from './strip.js';
+import { StripView } from './strip.js';
 
 // Update this after forking, or drop the link from index.html.
 const REPO_URL = 'https://github.com/ondrik/WebZoneClock';
@@ -56,11 +59,20 @@ const el = {
   themeMenu: document.getElementById('theme-menu'),
   themeName: document.getElementById('theme-name'),
   themeSwatch: document.getElementById('theme-swatch'),
+  hoursBtn: document.getElementById('hours-btn'),
+  hoursMenu: document.getElementById('hours-menu'),
+  dayStart: document.getElementById('hours-day-start'),
+  workStart: document.getElementById('hours-work-start'),
+  workEnd: document.getElementById('hours-work-end'),
+  weekends: document.getElementById('hours-weekends'),
+  sortMode: document.getElementById('sort-mode'),
   toast: document.getElementById('toast'),
+  live: document.getElementById('live'),
 };
 
 const map = new WorldMap(el.map);
 const pins = new PinLayer(el.pins);
+const strip = new StripView(el.strip);
 
 let timeline = null;
 let theme = null;
@@ -72,6 +84,8 @@ let travelMs = 0;
 let lastEntries = [];
 
 let lastRenderKey = '';
+let framePending = false;
+let frameForce = false;
 let searchIndex = 0;
 let searchMatches = [];
 
@@ -89,7 +103,7 @@ async function main() {
   theme = applyTheme(state.theme);
   // A shared link can pin the view to the moment the sender picked.
   if (state.sharedAt) travelMs = state.sharedAt - Date.now();
-  onChange(() => renderAll(true));
+  onChange(() => requestRender(true));
 
   timeline = new Timeline(
     {
@@ -103,7 +117,7 @@ async function main() {
     },
     (ms) => {
       travelMs = ms;
-      renderAll(true);
+      requestRender(true);
     },
   );
   if (travelMs !== 0) timeline.offsetMs = travelMs;
@@ -117,7 +131,7 @@ async function main() {
 
   const ro = new ResizeObserver(() => {
     map.resize();
-    renderAll(true);
+    requestRender(true);
   });
   ro.observe(el.map);
 
@@ -126,11 +140,11 @@ async function main() {
 
   // One tick a second is cheap and keeps the minute flip prompt; the heavy
   // work is gated behind a render key that only changes when the minute does.
-  setInterval(() => renderAll(false), 1000);
-  themeFontsReady(theme).then(() => renderAll(true));
-  window.addEventListener('pageshow', () => renderAll(true));
+  setInterval(() => requestRender(false), 1000);
+  themeFontsReady(theme).then(() => requestRender(true));
+  window.addEventListener('pageshow', () => requestRender(true));
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) renderAll(true);
+    if (!document.hidden) requestRender(true);
   });
 }
 
@@ -158,6 +172,23 @@ function renderKey(now) {
   ].join('|');
 }
 
+/**
+ * Coalesce renders to one per frame. Scrubbing fires a pointer event far
+ * faster than the map can be redrawn, and without this every one of them
+ * rebuilt the strip and repainted the canvas.
+ */
+function requestRender(force = false) {
+  frameForce = frameForce || force;
+  if (framePending) return;
+  framePending = true;
+  requestAnimationFrame(() => {
+    framePending = false;
+    const f = frameForce;
+    frameForce = false;
+    renderAll(f);
+  });
+}
+
 function renderAll(force) {
   const now = shownNow();
   const key = renderKey(now);
@@ -181,7 +212,7 @@ function buildEntries(now) {
   const refParts = zonedParts(now, homeTz);
 
   const entries = [];
-  for (const id of state.ids) {
+  for (const id of orderedIds()) {
     const city = getCity(id);
     if (!city) continue;
 
@@ -193,13 +224,29 @@ function buildEntries(now) {
       parts,
       time,
       meridiem,
-      state: dayState(parts.hour),
+      state: dayState(parts.hour, state.hours, state.weekends && isWeekend(parts)),
       isHome: id === state.homeId,
       offsetLabel: offsetLabel(now, city.tz),
       dayDelta: dayDelta(parts, refParts),
     });
   }
   return entries;
+}
+
+/**
+ * The city order to display. Sorting west to east is a view over the list, not
+ * a rewrite of it, so switching back restores whatever you arranged by hand.
+ */
+function orderedIds() {
+  if (state.sort !== 'offset') return state.ids;
+  const now = shownNow();
+  return [...state.ids].sort((a, b) => {
+    const ca = getCity(a);
+    const cb = getCity(b);
+    if (!ca || !cb) return 0;
+    const diff = offsetMinutes(now, ca.tz) - offsetMinutes(now, cb.tz);
+    return diff || ca.label.localeCompare(cb.label);
+  });
 }
 
 function homeTimezone() {
@@ -215,23 +262,30 @@ function homeTimezone() {
 /* ------------------------------------------------------------------ strip */
 
 function renderStrip(entries) {
-  el.strip.textContent = '';
   el.strip.dataset.hour12 = String(state.hour12);
-
-  // Colours for the sunlight bands, read from the theme's own tokens.
-  const css = getComputedStyle(document.documentElement);
-  const ctx = {
-    now: shownNow(),
-    bandColors: {
-      night: rgbTriplet(css.getPropertyValue('--band-night'), [20, 20, 24]),
-      day: rgbTriplet(css.getPropertyValue('--band-day'), [240, 220, 170]),
-    },
-  };
-
   el.stripEmpty.hidden = entries.length > 0;
-  for (const entry of entries) {
-    el.strip.appendChild(buildStripItem(theme.strip, entry, ctx));
+
+  // Colours for the sunlight bands, read from the theme's own tokens. The key
+  // lets a band know its gradient is stale when the theme changes under it.
+  const css = getComputedStyle(document.documentElement);
+  const night = rgbTriplet(css.getPropertyValue('--band-night'), [20, 20, 24]);
+  const day = rgbTriplet(css.getPropertyValue('--band-day'), [240, 220, 170]);
+
+  // Only meaningful once the list is in offset order, where neighbours sharing
+  // an offset genuinely belong together.
+  el.strip.dataset.sort = state.sort;
+  let previousOffset = null;
+  for (const e of entries) {
+    e.offsetBreak =
+      state.sort === 'offset' && previousOffset !== null && e.offsetLabel !== previousOffset;
+    previousOffset = e.offsetLabel;
   }
+
+  strip.render(theme.strip, entries, {
+    now: shownNow(),
+    bandColors: { night, day },
+    bandKey: `${theme.id}|${night}|${day}`,
+  });
 }
 
 function rgbTriplet(value, fallback) {
@@ -240,6 +294,8 @@ function rgbTriplet(value, fallback) {
 }
 
 function bindStripInteractions() {
+  bindStripKeys();
+
   el.strip.addEventListener('click', (e) => {
     const city = e.target.closest('.city');
     if (!city) return;
@@ -283,6 +339,7 @@ function bindStripInteractions() {
     const city = e.target.closest('.city');
     if (city && city.dataset.id !== draggingId) {
       const target = [...el.strip.children].indexOf(city);
+      if (state.sort !== 'manual') update({ sort: 'manual' });
       reorder(draggingId, target);
     }
     cleanupDrag();
@@ -297,6 +354,84 @@ function bindStripInteractions() {
       t.classList?.remove('drop-target');
     }
   }
+}
+
+/**
+ * Everything the mouse can do to a city, from the keyboard: move between them
+ * with the arrows, set home with Enter, remove with Delete, and reorder with
+ * Alt held down. Focus is restored afterwards because reordering moves the
+ * node, and removing takes it away entirely.
+ */
+function bindStripKeys() {
+  el.strip.addEventListener('keydown', (e) => {
+    const city = e.target.closest('.city');
+    if (!city) return;
+    const id = city.dataset.id;
+    const order = state.ids;
+    const at = order.indexOf(id);
+
+    const step = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1
+      : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0;
+
+    if (step && e.altKey) {
+      e.preventDefault();
+      const to = at + step;
+      if (to < 0 || to >= order.length) return;
+      if (state.sort !== 'manual') update({ sort: 'manual' });
+      reorder(id, to);
+      focusCity(id);
+      announce(`${cityLabel(id)} moved to position ${to + 1} of ${order.length}`);
+    } else if (step) {
+      e.preventDefault();
+      const next = order[(at + step + order.length) % order.length];
+      focusCity(next);
+    } else if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      setHome(id);
+      focusCity(id);
+      announce(
+        state.homeId === id ? `${cityLabel(id)} is now your home city` : 'Home city cleared',
+      );
+    } else if (e.key === 'Delete' || e.key === 'Backspace') {
+      e.preventDefault();
+      const label = cityLabel(id);
+      const fallback = order[at + 1] ?? order[at - 1] ?? null;
+      removeCity(id);
+      announce(`${label} removed`);
+      if (fallback) focusCity(fallback);
+      else el.addCity.focus();
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      focusCity(order[0]);
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      focusCity(order.at(-1));
+    }
+  });
+}
+
+function cityLabel(id) {
+  return getCity(id)?.label ?? id;
+}
+
+/** Focus a city after the render that follows a state change. */
+function focusCity(id) {
+  requestAnimationFrame(() => {
+    const node = strip.nodeFor(id);
+    if (node) {
+      node.focus();
+      node.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    }
+  });
+}
+
+/** Say something once, for screen readers only. */
+function announce(message) {
+  el.live.textContent = '';
+  // A fresh text node in the next frame is what makes the region speak again.
+  requestAnimationFrame(() => {
+    el.live.textContent = message;
+  });
 }
 
 /* ---------------------------------------------------------------- toolbar */
@@ -316,9 +451,11 @@ function bindToolbar() {
     if (!btn) return;
     update({ hour12: btn.dataset.hour12 === '1' });
     syncSegmented();
+    hourControlsNeedRefill(); // the hour menu spells out am/pm too
   });
   syncSegmented();
 
+  bindSettings();
   el.share.addEventListener('click', share);
   el.addCalendar.addEventListener('click', () => {
     downloadInvite(shownNow(), lastEntries);
@@ -490,8 +627,7 @@ function buildThemeMenu() {
 }
 
 function toggleThemeMenu(open) {
-  el.themeMenu.hidden = !open;
-  el.themeBtn.setAttribute('aria-expanded', String(open));
+  toggleMenu(el.themeMenu, el.themeBtn, open);
 }
 
 function setTheme(id) {
@@ -499,9 +635,9 @@ function setTheme(id) {
   update({ theme: theme.id });
   syncThemeUi();
   // The strip layout and map style both changed; redraw everything.
-  renderAll(true);
+  requestRender(true);
   // Webfont metrics decide label widths, so place them again once they land.
-  themeFontsReady(theme).then(() => renderAll(true));
+  themeFontsReady(theme).then(() => requestRender(true));
 }
 
 function syncThemeUi() {
@@ -511,6 +647,74 @@ function syncThemeUi() {
   for (const b of el.themeMenu.querySelectorAll('button[data-theme]')) {
     b.setAttribute('aria-checked', String(b.dataset.theme === active.id));
   }
+}
+
+/** Working hours, weekend awareness and the city order. */
+function bindSettings() {
+  const label = (h) =>
+    state.hour12
+      ? `${h % 12 === 0 ? 12 : h % 12}:00 ${h < 12 || h === 24 ? 'am' : 'pm'}`
+      : `${String(h).padStart(2, '0')}:00`;
+
+  const fill = (select, from, to) => {
+    select.textContent = '';
+    for (let h = from; h <= to; h++) {
+      const o = document.createElement('option');
+      o.value = String(h);
+      o.textContent = label(h);
+      select.appendChild(o);
+    }
+  };
+
+  const refill = () => {
+    fill(el.dayStart, 0, 22);
+    fill(el.workStart, 0, 23);
+    fill(el.workEnd, 1, 24);
+    el.dayStart.value = String(state.hours.dayStart);
+    el.workStart.value = String(state.hours.workStart);
+    el.workEnd.value = String(state.hours.workEnd);
+    el.weekends.checked = state.weekends;
+    el.sortMode.value = state.sort;
+  };
+  refill();
+  hourControlsNeedRefill = refill;
+
+  const commit = () => {
+    update({
+      hours: normalizeHours({
+        dayStart: el.dayStart.value,
+        workStart: el.workStart.value,
+        workEnd: el.workEnd.value,
+      }),
+      weekends: el.weekends.checked,
+      sort: el.sortMode.value === 'offset' ? 'offset' : 'manual',
+    });
+    refill(); // normalising may have moved a boundary
+  };
+
+  for (const control of [el.dayStart, el.workStart, el.workEnd, el.weekends, el.sortMode]) {
+    control.addEventListener('change', commit);
+  }
+
+  el.hoursBtn.addEventListener('click', () => toggleMenu(el.hoursMenu, el.hoursBtn, el.hoursMenu.hidden));
+  document.addEventListener('click', (e) => {
+    if (!el.hoursMenu.hidden && !e.target.closest('.picker')) {
+      toggleMenu(el.hoursMenu, el.hoursBtn, false);
+    }
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !el.hoursMenu.hidden) {
+      toggleMenu(el.hoursMenu, el.hoursBtn, false);
+      el.hoursBtn.focus();
+    }
+  });
+}
+
+let hourControlsNeedRefill = () => {};
+
+function toggleMenu(menu, button, open) {
+  menu.hidden = !open;
+  button.setAttribute('aria-expanded', String(open));
 }
 
 function syncSegmented() {

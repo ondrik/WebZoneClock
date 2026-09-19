@@ -1,7 +1,24 @@
-import json, unicodedata, re
+"""Build data/cities.json from the city-timezones dataset.
 
-SRC = '/tmp/claude-1000/-home-ondra-WebZoneClock/929c71fc-3ec4-421f-9e19-834aeef18a68/scratchpad/cityMap.json'
-OUT = '/home/ondra/WebZoneClock/data/cities.json'
+Usage:
+    python3 tools/build_cities.py [SRC] [OUT]
+
+SRC defaults to tools/cache/cityMap.json and is downloaded if missing.
+"""
+
+import argparse
+import json
+import re
+import unicodedata
+import urllib.request
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+CACHE = ROOT / 'tools' / 'cache'
+UPSTREAM = (
+    'https://raw.githubusercontent.com/kevinroberts/city-timezones'
+    '/master/data/cityMap.json'
+)
 
 COUNTRY_FIX = {
     'United States of America': 'United States',
@@ -261,8 +278,22 @@ MANUAL = [
 def norm(s):
     return unicodedata.normalize('NFKD', s or '').encode('ascii','ignore').decode().lower()
 
+def fetch(src: Path) -> None:
+    if src.exists():
+        return
+    src.parent.mkdir(parents=True, exist_ok=True)
+    print(f'downloading {UPSTREAM}')
+    urllib.request.urlretrieve(UPSTREAM, src)
+
+
 def main():
-    raw = json.load(open(SRC))
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument('src', nargs='?', type=Path, default=CACHE / 'cityMap.json')
+    ap.add_argument('out', nargs='?', type=Path, default=ROOT / 'data' / 'cities.json')
+    args = ap.parse_args()
+
+    fetch(args.src)
+    raw = json.loads(args.src.read_text(encoding='utf-8'))
     seen = {}
     for c in raw:
         country = COUNTRY_FIX.get(c.get('country') or '', c.get('country') or '')
@@ -320,8 +351,14 @@ def main():
             print('   ', key)
 
     out = {'tz': tzs, 'countries': countries, 'cities': rows}
-    with open(OUT, 'w', encoding='utf-8') as f:
-        json.dump(out, f, ensure_ascii=False, separators=(',', ':'))
-    print(f'cities={len(rows)} timezones={len(tzs)} countries={len(countries)}')
+    args.out.parent.mkdir(parents=True, exist_ok=True)
+    args.out.write_text(
+        json.dumps(out, ensure_ascii=False, separators=(',', ':')), encoding='utf-8'
+    )
+    print(
+        f'{args.out}: cities={len(rows)} timezones={len(tzs)} countries={len(countries)}'
+    )
 
-main()
+
+if __name__ == '__main__':
+    main()

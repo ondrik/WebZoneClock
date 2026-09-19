@@ -47,7 +47,7 @@ export const THEMES = [
     strip: 'poster',
     map: 'halftone',
     scheme: 'light',
-    swatch: ['#e7ebe6', '#0d5c57', '#ff5545'],
+    swatch: ['#e7ebe6', '#0d5c57', '#f52e1b'],
     fonts: 'family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,700;12..96,800',
   },
   {

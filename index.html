@@ -33,6 +33,43 @@
         </svg>
       </button>
       <div class="picker">
+        <button id="hours-btn" class="icon-btn" type="button" aria-haspopup="true"
+                aria-expanded="false" title="Working hours and order"
+                aria-label="Working hours and order">
+          <svg viewBox="0 0 20 20" aria-hidden="true">
+            <circle cx="10" cy="10" r="7"/><path d="M10 5.6V10l3 1.8"/>
+          </svg>
+        </button>
+        <div id="hours-menu" class="picker-menu settings-menu" role="dialog"
+             aria-label="Working hours and order" hidden>
+          <p class="settings-note">Colours every city by what its people are likely doing.</p>
+          <label class="settings-row">
+            <span>Up from</span>
+            <select id="hours-day-start" aria-label="Hour people are up from"></select>
+          </label>
+          <label class="settings-row">
+            <span>Working</span>
+            <select id="hours-work-start" aria-label="Hour work starts"></select>
+          </label>
+          <label class="settings-row">
+            <span>until</span>
+            <select id="hours-work-end" aria-label="Hour work ends"></select>
+          </label>
+          <label class="settings-row settings-check">
+            <input type="checkbox" id="hours-weekends">
+            <span>Nobody works at the weekend</span>
+          </label>
+          <hr class="settings-rule">
+          <label class="settings-row">
+            <span>Order</span>
+            <select id="sort-mode" aria-label="How to order the cities">
+              <option value="manual">However I arranged them</option>
+              <option value="offset">West to east</option>
+            </select>
+          </label>
+        </div>
+      </div>
+      <div class="picker">
         <button id="theme-btn" class="text-btn" type="button" aria-haspopup="true"
                 aria-expanded="false" title="Change the look">
           <span class="swatch" id="theme-swatch" aria-hidden="true"></span>
@@ -53,7 +90,8 @@
   </header>
 
   <div class="strip-wrap">
-    <div id="strip" class="strip" role="list" aria-label="Your cities"></div>
+    <div id="strip" class="strip" role="list"
+         aria-label="Your cities. Arrow keys move between them, Enter sets your home city, Alt with an arrow reorders, Delete removes."></div>
     <p id="strip-empty" class="strip-empty" hidden>
       No cities yet — press <kbd>+</kbd> to add one.
     </p>
@@ -121,7 +159,16 @@
 </div>
 
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+<div id="live" class="visually-hidden" role="status" aria-live="polite"></div>
 
 <script type="module" src="assets/js/main.js"></script>
+<script>
+  // Offline support is an enhancement: if it fails, the app still works.
+  if ('serviceWorker' in navigator) {
+    addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    });
+  }
+</script>
 </body>
 </html>

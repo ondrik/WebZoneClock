@@ -1,8 +1,20 @@
-"""Pre-decode world-atlas TopoJSON into flat lon/lat rings the browser can draw directly."""
-import json
+"""Pre-decode world-atlas TopoJSON into flat lon/lat rings the browser can draw.
 
-SRC = '/tmp/claude-1000/-home-ondra-WebZoneClock/929c71fc-3ec4-421f-9e19-834aeef18a68/scratchpad/land-110m.json'
-OUT = '/home/ondra/WebZoneClock/data/land.json'
+Usage:
+    python3 tools/build_land.py [SRC] [OUT]
+
+SRC defaults to tools/cache/land-110m.json and is downloaded if missing.
+"""
+
+import argparse
+import json
+import urllib.request
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+CACHE = ROOT / 'tools' / 'cache'
+UPSTREAM = 'https://cdn.jsdelivr.net/npm/world-atlas@2/land-110m.json'
+
 PREC = 2  # ~1 km at the equator; far finer than one screen pixel on a world map
 
 
@@ -30,8 +42,22 @@ def ring_coords(arcs, indices):
     return out
 
 
+def fetch(src: Path) -> None:
+    if src.exists():
+        return
+    src.parent.mkdir(parents=True, exist_ok=True)
+    print(f'downloading {UPSTREAM}')
+    urllib.request.urlretrieve(UPSTREAM, src)
+
+
 def main():
-    topo = json.load(open(SRC))
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument('src', nargs='?', type=Path, default=CACHE / 'land-110m.json')
+    ap.add_argument('out', nargs='?', type=Path, default=ROOT / 'data' / 'land.json')
+    args = ap.parse_args()
+
+    fetch(args.src)
+    topo = json.loads(args.src.read_text(encoding='utf-8'))
     arcs = decode_arcs(topo)
     geom = topo['objects']['land']['geometries'][0]
     assert geom['type'] == 'MultiPolygon', geom['type']
@@ -53,12 +79,15 @@ def main():
         if rings:
             polygons.append(rings)
 
-    out = {'polygons': polygons}
-    with open(OUT, 'w') as f:
-        json.dump(out, f, separators=(',', ':'))
+    args.out.parent.mkdir(parents=True, exist_ok=True)
+    args.out.write_text(json.dumps({'polygons': polygons}, separators=(',', ':')))
 
     npts = sum(len(r) // 2 for p in polygons for r in p)
-    print(f'polygons={len(polygons)} rings={sum(len(p) for p in polygons)} points={npts}')
+    print(
+        f'{args.out}: polygons={len(polygons)} '
+        f'rings={sum(len(p) for p in polygons)} points={npts}'
+    )
 
 
-main()
+if __name__ == '__main__':
+    main()

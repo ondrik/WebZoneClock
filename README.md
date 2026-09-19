@@ -21,9 +21,12 @@ dependencies — it is meant to be served straight off GitHub Pages.
   | **Two-ink** | Oversized printed numerals, teal and coral | Halftone dots |
   | **Classic** | The original filled tiles | Solid grey landmasses |
 
-- **A three-state reading of each city's hour**: working (09:00–18:00), early
-  (06:00–09:00), or evening and night. Each look expresses it differently —
-  as a whole colour, an ink, or where the hand sits on a dial.
+- **A three-state reading of each city's hour**: working, awake but off the
+  clock, or asleep. Each look expresses it differently — as a whole colour, an
+  ink, or where the hand sits on a dial. The boundaries default to 06:00 /
+  09:00 / 18:00 and are yours to change, and weekends can suppress working
+  hours per city, so Friday evening in Prague and Saturday morning in Tokyo
+  read correctly at the same instant.
 - **Time travel.** Drag the map itself, or the ruler along its bottom edge,
   and every clock, tile colour and the map's shading move together, so you can
   find an hour that is civil in all of them. The handle reads the offset from
@@ -41,7 +44,14 @@ dependencies — it is meant to be served straight off GitHub Pages.
   routed around each other, and day/night shading computed from the sun's
   position.
 - **Add, remove and reorder**: `+` or the <kbd>n</kbd> key opens search over
-  ~2,300 cities, `×` on a tile removes it, and tiles drag to reorder.
+  ~2,300 cities, `×` removes a city, and cities drag to reorder. All of it
+  works from the keyboard too: arrows move between cities, <kbd>Enter</kbd>
+  sets your home city, <kbd>Alt</kbd> with an arrow reorders, <kbd>Delete</kbd>
+  removes, and each change is announced.
+- **Order them west to east** instead of by hand, which puts cities sharing an
+  offset next to each other. Dragging returns to your own order.
+- **Works offline** once visited; the city and map data are cached by a
+  service worker.
 - **12/24-hour** toggle, and a daylight toggle for the map shading.
 - **Shareable links**: the share button copies a URL with your cities in the
   fragment; if you are time-travelling it carries the chosen moment too, so
@@ -61,6 +71,19 @@ work — it needs an HTTP origin:
 python3 -m http.server 8777
 # then open http://127.0.0.1:8777/
 ```
+
+## Tests
+
+```sh
+npm test        # or: node --test
+```
+
+No dependencies: the suite runs on Node's own test runner, and `package.json`
+exists only so Node reads the modules as ESM. It covers the pure logic — solar
+position, timezone arithmetic, the day-state boundaries, the projection,
+sunrise and sunset, ICS generation, search ranking — plus two invariants that
+are easy to break by accident: every theme's text must clear WCAG AA contrast,
+and `data/` must match what `tools/` produces.
 
 ## Deploying
 
@@ -91,7 +114,7 @@ the "Source" link in the toolbar.
 | `pins.js` | Map markers and the label placement solver |
 | `citydb.js` | Loading, searching and ranking the city database |
 | `themes.js` | The five looks, their tokens and their webfonts |
-| `strip.js` | Building the city strip in each look's own layout |
+| `strip.js` | The city strip, in each look's own layout |
 | `daylight.js` | Solar elevation across a city's day; sunrise and sunset |
 | `timeline.js` | The time-travel ruler: ticks, day bands, drag and keyboard |
 | `calendar.js` | Building the `.ics` invitation |
@@ -136,6 +159,13 @@ crossings, so a band shows the day that city actually gets. It stays honest at
 high latitudes: a polar summer never crosses the horizon, so the band never
 goes dark, and `sunEvents` reports that rather than inventing a sunrise.
 
+**Redrawing** is coalesced to one frame. Scrubbing fires pointer events faster
+than the map can repaint, so renders are queued through `requestAnimationFrame`
+and the strip updates its nodes in place rather than rebuilding them — which
+also means keyboard focus survives a re-render. The halftone map caches its dot
+positions until the box resizes; computing them means rasterising the land and
+reading it back, which is far too slow to repeat per frame.
+
 **Label placement.** A pin is anchored at its city's exact coordinates and
 never moves; only its label does. Each label tries a series of offsets — beside
 the dot, then progressively above or below on either side — and takes the first
@@ -163,6 +193,12 @@ public-domain data and is unencumbered; **`data/cities.json` is CC BY 4.0 and
 requires attribution** if you redistribute it or a work built from it. Keep the
 section below, or regenerate `data/cities.json` from a source whose terms suit
 you better.
+
+## Contributing
+
+`npm test` must pass, and `tools/build_*.py` must leave `data/` unchanged. CI
+checks both. There is no linter, formatter or build step, and adding a runtime
+dependency would be a change of direction rather than a detail.
 
 ## Attribution
 

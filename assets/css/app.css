@@ -146,6 +146,34 @@ svg {
 .picker-name { font-weight: 500; }
 .picker-blurb { display: block; color: var(--fg-mute); font-size: 11.5px; font-weight: 400; }
 
+.settings-menu { min-width: 262px; padding: 11px 13px 13px; }
+.settings-note { margin: 0 0 9px; color: var(--fg-mute); font-size: 11.5px; line-height: 1.4; }
+.settings-rule { margin: 11px 0 9px; border: 0; border-top: 1px solid var(--menu-line); }
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 6px;
+  font-size: 13px;
+}
+.settings-row select {
+  min-width: 96px;
+  padding: 3px 6px;
+  border: 1px solid var(--control-line);
+  border-radius: 5px;
+  background: var(--control-bg);
+  color: var(--fg);
+  font: inherit;
+  font-size: 12.5px;
+}
+.settings-check { justify-content: flex-start; }
+.settings-check input { accent-color: var(--accent); }
+
+/* Cities that share an offset sit together when sorted west to east. */
+.strip[data-sort="offset"] .city[data-offset-break="true"] { box-shadow: inset 2px 0 0 var(--line); }
+
 /* ------------------------------------------------------------ city strip */
 .strip-wrap {
   flex: 0 0 auto;
@@ -164,6 +192,21 @@ svg {
 .strip::-webkit-scrollbar { display: none; }
 
 .city { position: relative; cursor: grab; }
+.city:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; z-index: 1; }
+.city:focus:not(:focus-visible) { outline: none; }
+.name-arrow[hidden], .city-dayoff[hidden], .band-sun[hidden] { display: none; }
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
 .city.dragging { opacity: 0.4; }
 .city.drop-target { box-shadow: inset 3px 0 0 var(--accent); }
 
@@ -185,14 +228,17 @@ svg {
   transition: opacity 0.12s ease;
 }
 .city-remove svg { width: 11px; height: 11px; stroke-width: 1.9; }
-.city:hover .city-remove { opacity: 0.7; }
+.city:hover .city-remove,
+.city:focus-visible .city-remove { opacity: 0.7; }
 .city-remove:hover { opacity: 1; }
 
 .city-name { display: flex; align-items: center; gap: 5px; }
 .city-sub { position: relative; }
 .city-sub .sub-offset { display: none; }
-.city:hover .city-sub .sub-country { display: none; }
-.city:hover .city-sub .sub-offset { display: inline; }
+.city:hover .city-sub .sub-country,
+.city:focus-visible .city-sub .sub-country { display: none; }
+.city:hover .city-sub .sub-offset,
+.city:focus-visible .city-sub .sub-offset { display: inline; }
 
 .clock { display: inline-flex; align-items: flex-start; }
 .clock .meridiem { font-size: 0.32em; font-weight: 400; opacity: 0.75; margin: 0.22em 0 0 0.12em; }
@@ -267,9 +313,9 @@ svg {
 .pin[data-state="work"] .pin-dot { background: var(--pin-work); }
 .pin[data-state="work"] .pin-arrow { color: var(--pin-work); }
 .pin[data-state="work"] .pin-time { color: var(--pin-work); }
-.pin[data-state="early"] .pin-dot { background: var(--pin-early); }
-.pin[data-state="early"] .pin-arrow { color: var(--pin-early); }
-.pin[data-state="early"] .pin-time { color: var(--pin-early); }
+.pin[data-state="awake"] .pin-dot { background: var(--pin-awake); }
+.pin[data-state="awake"] .pin-arrow { color: var(--pin-awake); }
+.pin[data-state="awake"] .pin-time { color: var(--pin-awake); }
 
 .pin.off-map { opacity: 0.6; }
 .pin.off-map .pin-dot { border-radius: 2px; }

@@ -1,5 +1,9 @@
 # Data generation
 
+Both scripts fetch their input into `tools/cache/` (git-ignored) if it is not
+already there, and write into `data/`. Re-running them must leave `data/`
+byte-identical; CI fails the build if it does not.
+
 Both files in `data/` are generated and checked in, so the site has no build
 step and no runtime dependencies. Regenerate them only when you want to change
 what they contain.
@@ -10,9 +14,8 @@ what they contain.
 country and timezone strings are interned into lookup tables).
 
 ```sh
-curl -sSL -o /tmp/cityMap.json \
-  https://raw.githubusercontent.com/kevinroberts/city-timezones/master/data/cityMap.json
-python3 tools/build_cities.py            # edit SRC at the top if you cache elsewhere
+python3 tools/build_cities.py            # downloads to tools/cache/ on first run
+python3 tools/build_cities.py SRC OUT    # or point it somewhere else
 ```
 
 The script keeps every city over 150,000 people, plus a hand-maintained
@@ -29,8 +32,8 @@ World coastlines, as flat rings of `lon, lat` pairs at two decimal places
 (about 1 km, far finer than one screen pixel on a world map).
 
 ```sh
-curl -sSL -o /tmp/land-110m.json https://cdn.jsdelivr.net/npm/world-atlas@2/land-110m.json
-python3 tools/build_land.py
+python3 tools/build_land.py              # downloads to tools/cache/ on first run
+python3 tools/build_land.py SRC OUT      # or point it somewhere else
 ```
 
 This decodes the TopoJSON — delta-decoding the arcs, stitching them into

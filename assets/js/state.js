@@ -6,6 +6,7 @@
 
 import { getCity, cityForTimezone } from './citydb.js';
 import { DEFAULT_THEME, getTheme } from './themes.js';
+import { DEFAULT_HOURS, normalizeHours } from './tz.js';
 
 const STORAGE_KEY = 'webzoneclock.v1';
 
@@ -24,6 +25,10 @@ export const state = {
   hour12: false,
   daylight: true,
   theme: DEFAULT_THEME,
+  hours: DEFAULT_HOURS,
+  weekends: true,
+  // 'manual' keeps the order you dragged them into; 'offset' sorts west to east.
+  sort: 'manual',
   // Set when a shared link carried a specific moment; consumed once by main.
   sharedAt: null,
 };
@@ -92,6 +97,9 @@ export function init() {
   state.hour12 = Boolean(stored?.hour12);
   state.daylight = stored?.daylight !== false;
   state.theme = getTheme(stored?.theme).id;
+  state.hours = normalizeHours(stored?.hours);
+  state.weekends = stored?.weekends !== false;
+  state.sort = stored?.sort === 'offset' ? 'offset' : 'manual';
   // Only a link carries a moment; a value in storage would be stale.
   state.sharedAt = fromHash ? (fromHash.sharedAt ?? null) : null;
   state.homeId =
@@ -118,6 +126,9 @@ function save() {
         hour12: state.hour12,
         daylight: state.daylight,
         theme: state.theme,
+        hours: state.hours,
+        weekends: state.weekends,
+        sort: state.sort,
       }),
     );
   } catch {

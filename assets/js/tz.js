@@ -78,15 +78,45 @@ export function dayDelta(parts, refParts) {
   return Math.round((a - b) / 86400000);
 }
 
+/** The default working day, matching the app this was modelled on. */
+export const DEFAULT_HOURS = { dayStart: 6, workStart: 9, workEnd: 18 };
+
 /**
- * Which of the three tile colours a local hour falls into.
+ * Which of the three states a local hour falls into.
  *
- * Boundaries read off the original app while scrubbing its timeline: 17:59 is
- * still green and 18:00 is not, 8:59 is white and 9:00 is green. Evening is
- * grouped with the night rather than with the early morning.
+ * The defaults were read off the original app by scrubbing its timeline: 17:59
+ * is still working hours and 18:00 is not, 08:59 is "awake" and 09:00 is not.
+ * Evening belongs with the night. On a weekend nobody is at work, so the
+ * working band collapses into "awake".
  */
-export function dayState(hour) {
-  if (hour >= 9 && hour < 18) return 'work';
-  if (hour >= 6 && hour < 9) return 'early';
-  return 'asleep';
+export function dayState(hour, hours = DEFAULT_HOURS, isWeekend = false) {
+  const { dayStart, workStart, workEnd } = hours;
+  if (hour < dayStart || hour >= workEnd) return 'asleep';
+  if (!isWeekend && hour >= workStart) return 'work';
+  return 'awake';
+}
+
+/** Saturday or Sunday in the city's own week. */
+export function isWeekend(parts) {
+  return parts.weekday === 'Sat' || parts.weekday === 'Sun';
+}
+
+/**
+ * Keep the three boundaries ordered and inside a day.
+ *
+ * Note that `null` and `''` are treated as absent rather than coerced: both
+ * become 0 through Number(), which is a perfectly valid hour, so a missing
+ * setting would otherwise silently mean midnight.
+ */
+export function normalizeHours(h) {
+  const hour = (v, lo, hi, fallback) => {
+    const n = v === null || v === undefined || v === '' ? NaN : Math.round(Number(v));
+    const chosen = Number.isFinite(n) ? n : fallback;
+    return Math.min(hi, Math.max(lo, chosen));
+  };
+
+  const dayStart = hour(h?.dayStart, 0, 22, DEFAULT_HOURS.dayStart);
+  const workStart = hour(h?.workStart, dayStart, 23, DEFAULT_HOURS.workStart);
+  const workEnd = hour(h?.workEnd, workStart + 1, 24, DEFAULT_HOURS.workEnd);
+  return { dayStart, workStart, workEnd };
 }

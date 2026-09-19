@@ -19,8 +19,8 @@ const NIGHT_ELEV = -8;
 const HALFTONE_PITCH = 7; // px between dot centres
 const GRATICULE_STEP = 20; // degrees between engraved graticule lines
 
-const GRID_W = 480;
-const GRID_H = 240;
+const GRID_W = 320;
+const GRID_H = 160;
 
 export class WorldMap {
   constructor(canvas) {
@@ -30,6 +30,8 @@ export class WorldMap {
     this.width = 0;
     this.height = 0;
     this.proj = makeProjection(1, 1);
+    // Halftone dot centres, recomputed only when the map box changes.
+    this.dots = null;
 
     this.shade = document.createElement('canvas');
     this.shade.width = GRID_W;
@@ -57,6 +59,7 @@ export class WorldMap {
     this.canvas.height = Math.round(h * dpr);
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     this.proj = makeProjection(w, h);
+    this.dots = null; // the map box moved, so the stipple has to be rebuilt
   }
 
   /** `mode` is the active theme's map style: filled, soft, engraved, halftone. */
@@ -144,16 +147,38 @@ export class WorldMap {
     ctx.restore();
   }
 
-  /** Land as a field of printed dots. */
+  /**
+   * Land as a field of printed dots.
+   *
+   * Working out which dots fall on land means rasterising the landmass and
+   * reading it back, which is far too slow to repeat while someone is dragging
+   * the map. The positions depend only on the map box, so they are computed
+   * once and reused until it resizes.
+   */
   stippleLand(colors) {
-    const { ctx } = this;
-    const { rect } = this.proj;
+    if (!this.dots) this.dots = this.buildHalftone();
 
-    // Draw the landmass to an offscreen mask, then read it back to decide
-    // where a dot belongs — far simpler than testing point-in-polygon.
+    const { ctx } = this;
+    const r = HALFTONE_PITCH * 0.32;
+    ctx.fillStyle = colors.land;
+    ctx.beginPath();
+    for (let i = 0; i < this.dots.length; i += 2) {
+      const x = this.dots[i];
+      ctx.moveTo(x + r, this.dots[i + 1]);
+      ctx.arc(x, this.dots[i + 1], r, 0, Math.PI * 2);
+    }
+    ctx.fill();
+  }
+
+  /** Rasterise the land once and keep the dot centres that landed on it. */
+  buildHalftone() {
+    const { rect } = this.proj;
+    const w = Math.max(1, Math.round(rect.w));
+    const h = Math.max(1, Math.round(rect.h));
+
     const mask = document.createElement('canvas');
-    mask.width = Math.max(1, Math.round(rect.w));
-    mask.height = Math.max(1, Math.round(rect.h));
+    mask.width = w;
+    mask.height = h;
     const mctx = mask.getContext('2d', { willReadFrequently: true });
 
     mctx.translate(-rect.x, -rect.y);
@@ -166,18 +191,16 @@ export class WorldMap {
     });
     this.ctx = saved;
 
-    const data = mctx.getImageData(0, 0, mask.width, mask.height).data;
-    ctx.fillStyle = colors.land;
-
-    for (let y = HALFTONE_PITCH / 2; y < mask.height; y += HALFTONE_PITCH) {
-      for (let x = HALFTONE_PITCH / 2; x < mask.width; x += HALFTONE_PITCH) {
-        const i = ((y | 0) * mask.width + (x | 0)) * 4 + 3;
-        if (data[i] < 128) continue;
-        ctx.beginPath();
-        ctx.arc(rect.x + x, rect.y + y, HALFTONE_PITCH * 0.32, 0, Math.PI * 2);
-        ctx.fill();
+    const data = mctx.getImageData(0, 0, w, h).data;
+    const out = [];
+    for (let y = HALFTONE_PITCH / 2; y < h; y += HALFTONE_PITCH) {
+      for (let x = HALFTONE_PITCH / 2; x < w; x += HALFTONE_PITCH) {
+        if (data[((y | 0) * w + (x | 0)) * 4 + 3] >= 128) {
+          out.push(rect.x + x, rect.y + y);
+        }
       }
     }
+    return Float64Array.from(out);
   }
 
   /** Meridians and parallels, for the chart-like themes. */
@@ -265,7 +288,7 @@ export class WorldMap {
  * Rewrite a polygon's longitudes so each ring is continuous, and work out
  * which whole-turn shifts can actually put part of it on screen.
  */
-function unwrapPolygon(rings) {
+export function unwrapPolygon(rings) {
   let min = Infinity;
   let max = -Infinity;
 
@@ -303,7 +326,7 @@ function unwrapPolygon(rings) {
 }
 
 /** "27 42 74" -> [27, 42, 74]; falls back to black. */
-function parseRgbTriplet(value) {
+export function parseRgbTriplet(value) {
   const nums = String(value).match(/\d+/g);
   if (!nums || nums.length < 3) return [0, 0, 0];
   return [Number(nums[0]), Number(nums[1]), Number(nums[2])];

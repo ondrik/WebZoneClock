@@ -1,0 +1,10 @@
+{
+  "name": "webzoneclock",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A world clock for the browser. No build step and no runtime dependencies; this file exists so Node treats the modules as ESM when running the tests.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  }
+}
