@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # No dependencies to install: the suite runs on Node's own test runner.
+      - name: Run tests
+        run: npm test
+
+      - name: Check the generated data is in sync with the build scripts
+        run: |
+          python3 tools/build_cities.py
+          python3 tools/build_land.py
+          if ! git diff --quiet -- data/; then
+            echo "::error::data/ does not match what tools/ produces. Re-run the build scripts and commit the result."
+            git --no-pager diff --stat -- data/
+            exit 1
+          fi
